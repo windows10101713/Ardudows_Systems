@@ -422,32 +422,6 @@ Upload firmware to ESP32-S3
     └── Product.alf
 ```
 
-# 🖼️ 스크린샷 / Screenshots
-
-## 🧮 계산기 데모 / Calculator Demo
-
-Ardudows Systems에 내장된 계산기 기능 예시입니다.  
-Example of the built-in calculator running on Ardudows Systems.
-
-- ESP32-S3 기반 실행  
-  Running on ESP32-S3
-
-- ATK Kernel 사용  
-  Using ATK Kernel
-
-- 명령어 기반 인터페이스  
-  Command-line interface
-
-- PS/2 키보드 입력 지원  
-  PS/2 keyboard input support
-
-- SPI TFT 디스플레이 출력  
-  SPI TFT display rendering
-
-![Ardudows Calculator](images/calc.jpg)
-
----
-
 # 📖 파일 확장자 / File Extension Types
 
 | Extension | Description                     |
