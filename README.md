@@ -7,9 +7,9 @@ You needs
 3. PS/2 keyboard
 
 This need libraries
-#include <string.h>
-#include <TFT_eSPI.h>
-#include <SPI.h>
+<string.h>
+<TFT_eSPI.h>
+<SPI.h>
 #include <FS.h>
 #include <SD.h>
 #include <esp_system.h>
