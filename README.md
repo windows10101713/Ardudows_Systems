@@ -7,12 +7,12 @@ You needs
 3. PS/2 keyboard
 
 This need libraries
-<string.h>
-<TFT_eSPI.h>
-<SPI.h>
-#include <FS.h>
-#include <SD.h>
-#include <esp_system.h>
+1. <string.h>
+2. <TFT_eSPI.h>
+3. <SPI.h>
+4.#include <FS.h>
+5. #include <SD.h>
+6. #include <esp_system.h>
 #include <WiFi.h>
 #include "Fonts/ASCFont.h"
 #include "Fonts/KSFont.h"
