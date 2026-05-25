@@ -117,16 +117,99 @@ Ardudows Systems is not just a simple Arduino project, but an experimental syste
 The following hardware is required.
 
 1. ESP32-S3 N16R8
-2. SPI TFT Display
+2. SPI TFT Display (ILI9488 Recommended)
 3. PS/2 Keyboard
 4. SD Card Module (Optional)
 5. USB-compatible peripherals (Optional)
 
 ---
 
+# 🔧 TFT_eSPI 설정 / TFT_eSPI Configuration
+
+Ardudows Systems를 사용하기 전에 TFT_eSPI 라이브러리 설정이 필요합니다.
+Before using Ardudows Systems, TFT_eSPI library configuration is required.
+
+다음 파일을 수정하세요:
+Edit the following file:
+
+```text
+C:\Users\user\OneDrive\문서\Arduino\libraries\TFT_eSPI\User_Setup.h
+```
+
+아래 설정으로 변경하세요:
+Replace the contents with the following configuration:
+
+```cpp id="4n2w8f"
+// ==========================================================
+//  Ardudows TFT Setup
+//  ESP32-S3 + ILI9488 (SPI)
+// ==========================================================
+
+#define USER_SETUP_INFO "ESP32-S3 + ILI9488 SPI"
+
+// -------------------------------
+// Display driver
+// -------------------------------
+#define ILI9488_DRIVER
+
+// -------------------------------
+// SPI pins (ESP32-S3 SAFE PINS)
+// -------------------------------
+// ❗ USB / JTAG / FLASH 와 겹치지 않는 핀만 사용
+
+#define TFT_MOSI 11
+#define TFT_SCLK 14
+#define TFT_CS   10
+#define TFT_DC   9
+#define TFT_RST  8
+
+#define SD_CS    7
+#define SD_MISO  13
+#define SD_MOSI  6
+#define SD_SCLK  16
+
+// -------------------------------
+// Backlight
+// -------------------------------
+#define TFT_BL -1
+#define TFT_BACKLIGHT_ON HIGH
+
+// -------------------------------
+// SPI settings
+// -------------------------------
+#define SPI_FREQUENCY       40000000
+#define SPI_READ_FREQUENCY  20000000
+#define SPI_TOUCH_FREQUENCY 2500000
+
+// -------------------------------
+// ESP32-S3 SPI
+// -------------------------------
+#define USE_HSPI_PORT
+
+// -------------------------------
+// Display size
+// -------------------------------
+#define DISPLAY_W 480
+#define DISPLAY_H 320
+
+// -------------------------------
+// Fonts
+// -------------------------------
+#define LOAD_GLCD
+#define LOAD_FONT2
+#define LOAD_FONT4
+#define LOAD_FONT6
+#define LOAD_FONT7
+#define LOAD_FONT8
+#define LOAD_GFXFF
+#define SMOOTH_FONT
+```
+
+---
+
 # 📚 사용 라이브러리 / Used Libraries
 
-```cpp id="o4p1aw"
+```cpp id="k8d1xa"
 #include <string.h>
 #include <TFT_eSPI.h>
 #include <SPI.h>
