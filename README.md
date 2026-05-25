@@ -1,215 +1,132 @@
-# [Ardudows Systems GitHub Repository](https://github.com/windows10101713/Ardudows_Systems?utm_source=chatgpt.com)
-
 # 🖥️ Ardudows Systems
 
-### ESP32-S3 기반 임베디드 운영체제 프로젝트
+### ESP32-S3 기반 실험적 임베디드 운영체제
 
-### Embedded Operating System Project for ESP32-S3
+### Experimental Embedded Operating System for ESP32-S3
 
-Ardudows Systems는 ESP32-S3를 기반으로 제작된 경량 임베디드 운영체제 프로젝트입니다.
-Ardudows Systems is a lightweight embedded operating system project built for the ESP32-S3 platform.
-
-TFT 디스플레이, PS/2 키보드, SD 카드, Wi-Fi 및 USB 기능을 활용하여 마이크로컨트롤러 환경에서 데스크톱 스타일 인터페이스와 시스템 기능을 구현하는 것을 목표로 합니다.
-The project aims to implement desktop-style interfaces and system-level functionality in a microcontroller environment using TFT displays, PS/2 keyboards, SD cards, Wi-Fi, and USB features.
-
-Ardudows Systems는 단순한 Arduino 프로젝트가 아니라, ESP32-S3의 하드웨어 성능을 최대한 활용하여 소형 컴퓨터 수준의 환경을 구축하는 실험적인 시스템입니다.
-Ardudows Systems is not just a simple Arduino project, but an experimental system designed to push the ESP32-S3 toward a mini computer-like environment.
+> “ESP32-S3를 어디까지 컴퓨터처럼 만들 수 있을까?”
+> “How far can an ESP32-S3 become a computer-like system?”
 
 ---
 
-# ✨ 주요 기능 / Core Features
+# 📖 소개 / Introduction
 
-## 🪟 그래픽 인터페이스 / Graphical Interface
+Ardudows Systems는 ESP32-S3 기반으로 제작된 실험적 임베디드 운영체제 프로젝트입니다.
+Ardudows Systems is an experimental embedded operating system project built for the ESP32-S3 platform.
 
-* TFT_eSPI 기반 그래픽 렌더링 시스템
-  TFT_eSPI-based graphical rendering system
+이 프로젝트는 단순한 Arduino 예제가 아니라, 마이크로컨트롤러 환경에서 운영체제 구조를 구현하는 것을 목표로 합니다.
+This project is not just a simple Arduino sketch. It aims to implement operating-system-like structures inside a microcontroller environment.
 
-* 창(Window) 스타일 사용자 인터페이스
-  Window-style user interface
+GUI 시스템, 파일 시스템, 레지스트리, 드라이버 구조, 네트워크 시스템, USB Host, OTA 업데이트 등을 직접 구현하고 있습니다.
+GUI systems, file systems, registry systems, driver structures, networking systems, USB Host support, and OTA updates are implemented directly inside the project.
 
-* 키보드 기반 입력 시스템
-  Keyboard-driven input system
+---
 
-* JPEG 이미지 디코딩 지원
-  JPEG image decoding support
+# ⚠️ Important Notice / 중요 안내
+
+Ardudows Systems는 매우 실험적인 프로젝트입니다.
+Ardudows Systems is a highly experimental project.
+
+일부 기능은 아직 완전히 구현되지 않았거나 정상적으로 동작하지 않을 수 있습니다.
+Some features may not be fully implemented or may not work correctly.
+
+특히 다음 기능들은 개발 중이거나 불안정할 수 있습니다:
+The following systems may still be unstable or incomplete:
+
+* USB Host
+* BLE Features
+* Async Networking
+* OTA Update
+* GUI Components
+* File System Operations
+* Multi-tasking
+
+ESP32-S3 환경, SPI 속도, 라이브러리 버전 등에 따라 동작이 달라질 수 있습니다.
+Behavior may vary depending on ESP32-S3 environment, SPI speed, and library versions.
+
+---
+
+# ✨ 주요 특징 / Features
+
+## 🪟 GUI 시스템 / GUI System
+
+* TFT_eSPI 기반 GUI
+* Keyboard-driven interface
+* Window-style desktop environment
+* JPEG image rendering support
 
 ---
 
 ## 📂 파일 시스템 / File System
 
-* SD 카드 기반 파일 저장 시스템
-  SD card-based file storage system
-
-* FS(File System) API 지원
-  FS (File System) API support
-
-* 설정 저장 및 Preferences 관리
-  Preferences-based configuration storage
-
-* 운영체제 스타일 디렉터리 구조
-  Operating system-style directory structure
+* SD 카드 기반 저장 구조
+* Custom directory system
+* Registry-style configuration files
+* Custom Ardudows file extensions
 
 ---
 
-## 🌐 네트워크 기능 / Networking Features
+## 🌐 네트워크 기능 / Networking
 
-* Wi-Fi 연결 및 관리
-  Wi-Fi connectivity and management
-
-* HTTP / HTTPS 클라이언트 기능
-  HTTP / HTTPS client functionality
-
-* 내장 Web Server 지원
-  Built-in Web Server support
-
-* DNS Server 기능 지원
-  DNS Server functionality
-
-* Async TCP 및 비동기 네트워크 처리
-  Async TCP and asynchronous networking
-
-* Socket.IO 기반 실시간 통신 지원
-  Socket.IO-based real-time communication
+* Wi-Fi support
+* HTTP / HTTPS client
+* Async Web Server
+* DNS Server
+* Socket.IO support
 
 ---
 
-## ⚙️ 시스템 기능 / System Features
+## 🔌 하드웨어 기능 / Hardware Features
 
-* OTA(Over-The-Air) 업데이트 지원
-  OTA (Over-The-Air) update support
-
-* ESP-IDF 시스템 API 활용
-  ESP-IDF system API integration
-
-* FreeRTOS 세마포어 및 멀티태스킹 지원
-  FreeRTOS semaphore and multitasking support
-
-* 로그 및 디버깅 시스템
-  Logging and debugging system
-
-* 메모리 및 시스템 상태 관리
-  Memory and system state management
+* USB Host support
+* TinyUSB integration
+* BLE Scan / BLE Client
+* OTA firmware update
+* SPI TFT display support
+* PS/2 keyboard support
 
 ---
 
-## 🔌 USB 및 BLE 기능 / USB and BLE Features
+# 🧠 프로젝트 목표 / Project Goals
 
-* USB Host 기능 지원
-  USB Host functionality support
+Ardudows Systems의 목표는 ESP32-S3를 단순 IoT 칩이 아닌 “소형 컴퓨터 플랫폼”처럼 활용하는 것입니다.
+The goal of Ardudows Systems is to push the ESP32-S3 beyond a simple IoT chip and use it as a mini computer platform.
 
-* TinyUSB(tusb) 기반 USB 처리
-  TinyUSB (tusb)-based USB processing
+이 프로젝트는 다음 개념들을 실험합니다:
+This project experiments with:
 
-* BLE 스캔 기능
-  BLE scanning functionality
-
-* BLE 클라이언트 연결 지원
-  BLE client connection support
-
-* BLE Advertised Device 분석 기능
-  BLE advertised device analysis support
+* 🖥️ GUI systems
+* ⚡ Lightweight operating system structures
+* 📂 File system architecture
+* 🌐 Network integration
+* 🔌 Hardware abstraction
+* 🧠 Embedded desktop environments
 
 ---
 
 # 🧩 하드웨어 요구사항 / Hardware Requirements
 
-다음 하드웨어가 필요합니다.
-The following hardware is required.
+## 필수 하드웨어 / Required Hardware
 
-1. ESP32-S3 N16R8
-2. SPI TFT Display (ILI9488 Recommended)
-3. PS/2 Keyboard
-4. SD Card Module (Optional)
-5. USB-compatible peripherals (Optional)
+* ESP32-S3 N16R8
+* SPI TFT Display (ILI9488 Recommended)
+* PS/2 Keyboard
 
----
+## 선택 하드웨어 / Optional Hardware
 
-# 🔧 TFT_eSPI 설정 / TFT_eSPI Configuration
-
-Ardudows Systems를 사용하기 전에 TFT_eSPI 라이브러리 설정이 필요합니다.
-Before using Ardudows Systems, TFT_eSPI library configuration is required.
-
-다음 파일을 수정하세요:
-Edit the following file:
-
-```text
-C:\Users\user\OneDrive\문서\Arduino\libraries\TFT_eSPI\User_Setup.h
-```
-
-아래 설정으로 변경하세요:
-Replace the contents with the following configuration:
-
-```cpp id="4n2w8f"
-// ==========================================================
-//  Ardudows TFT Setup
-//  ESP32-S3 + ILI9488 (SPI)
-// ==========================================================
-
-#define USER_SETUP_INFO "ESP32-S3 + ILI9488 SPI"
-
-// -------------------------------
-// Display driver
-// -------------------------------
-#define ILI9488_DRIVER
-
-// -------------------------------
-// SPI pins (ESP32-S3 SAFE PINS)
-// -------------------------------
-// ❗ USB / JTAG / FLASH 와 겹치지 않는 핀만 사용
-
-#define TFT_MOSI 11
-#define TFT_SCLK 14
-#define TFT_CS   10
-#define TFT_DC   9
-#define TFT_RST  8
-
-#define SD_CS    7
-#define SD_MISO  13
-#define SD_MOSI  6
-#define SD_SCLK  16
-
-// -------------------------------
-// Backlight
-// -------------------------------
-#define TFT_BL -1
-#define TFT_BACKLIGHT_ON HIGH
-
-// -------------------------------
-// SPI settings
-// -------------------------------
-#define SPI_FREQUENCY       40000000
-#define SPI_READ_FREQUENCY  20000000
-#define SPI_TOUCH_FREQUENCY 2500000
-
-// -------------------------------
-// ESP32-S3 SPI
-// -------------------------------
-#define USE_HSPI_PORT
-
-// -------------------------------
-// Display size
-// -------------------------------
-#define DISPLAY_W 480
-#define DISPLAY_H 320
-
-// -------------------------------
-// Fonts
-// -------------------------------
-#define LOAD_GLCD
-#define LOAD_FONT2
-#define LOAD_FONT4
-#define LOAD_FONT6
-#define LOAD_FONT7
-#define LOAD_FONT8
-#define LOAD_GFXFF
-#define SMOOTH_FONT
-```
+* SD Card Module
+* RTC Module
+* USB Devices
+* Wi-Fi Network
 
 ---
 
-# 📚 사용 라이브러리 / Used Libraries
+# 📦 사용 라이브러리 / Libraries Used
 
-```cpp id="k8d1xa"
+Ardudows Systems는 많은 라이브러리와 저수준 ESP32 기능을 사용합니다.
+Ardudows Systems uses many libraries and low-level ESP32 features.
+
+```cpp
 #include <string.h>
 #include <TFT_eSPI.h>
 #include <SPI.h>
@@ -248,38 +165,352 @@ Replace the contents with the following configuration:
 
 ---
 
-# 🎯 프로젝트 목표 / Project Goals
+# 🧪 개발 환경 / Development Environment
 
-Ardudows Systems의 목표는 ESP32-S3를 단순한 IoT 칩이 아닌, 실제 운영체제 개념을 실험할 수 있는 플랫폼으로 확장하는 것입니다.
-The goal of Ardudows Systems is to transform the ESP32-S3 from a simple IoT chip into a platform capable of experimenting with real operating system concepts.
-
-이 프로젝트는 다음과 같은 영역을 탐구합니다.
-This project explores areas such as:
-
-* 🖥️ 임베디드 GUI 시스템
-  Embedded GUI systems
-
-* ⚡ 경량 운영체제 구조
-  Lightweight operating system architecture
-
-* 🌍 네트워크 기반 시스템 기능
-  Network-based system functionality
-
-* 🧠 저사양 하드웨어 최적화
-  Low-resource hardware optimization
-
-* 🔬 ESP32 기반 컴퓨터화 실험
-  ESP32-based computerization experiments
+| Component           | Version         |
+| ------------------- | --------------- |
+| Arduino IDE         | 2.x             |
+| ESP32 Board Package | 3.3.8           |
+| Board               | ESP32-S3 N16R8  |
+| Display             | ILI9488 SPI TFT |
+| PSRAM               | Enabled         |
 
 ---
 
-# 🚧 개발 상태 / Development Status
+# 🔧 Required TFT_eSPI Configuration / 필수 TFT_eSPI 설정
 
-현재 Ardudows Systems는 활발히 개발 중인 프로젝트입니다.
-Ardudows Systems is currently under active development.
+다음 파일을 수정해야 합니다:
+You must edit this file:
 
-새로운 시스템 기능, 응용 프로그램, 드라이버 및 최적화 작업이 지속적으로 추가되고 있습니다.
-New system features, applications, drivers, and optimizations are continuously being added.
+```text
+Arduino/libraries/TFT_eSPI/User_Setup.h
+```
+
+권장 설정:
+Recommended configuration:
+
+```cpp
+// ==========================================================
+//  Ardudows TFT Setup
+//  ESP32-S3 + ILI9488 (SPI)
+// ==========================================================
+
+#define USER_SETUP_INFO "ESP32-S3 + ILI9488 SPI"
+
+// -------------------------------
+// Display driver
+// -------------------------------
+#define ILI9488_DRIVER
+
+// -------------------------------
+// SPI pins (ESP32-S3 SAFE PINS)
+// -------------------------------
+
+#define TFT_MOSI 11
+#define TFT_SCLK 14
+#define TFT_CS   10
+#define TFT_DC   9
+#define TFT_RST  8
+
+//#define TFT_MISO 35
+
+#define SD_CS    7
+#define SD_MISO  13
+#define SD_MOSI  6
+#define SD_SCLK  16
+
+// -------------------------------
+// Backlight
+// -------------------------------
+
+#define TFT_BL -1
+#define TFT_BACKLIGHT_ON HIGH
+
+// -------------------------------
+// SPI settings
+// -------------------------------
+
+#define SPI_FREQUENCY       40000000
+#define SPI_READ_FREQUENCY  20000000
+#define SPI_TOUCH_FREQUENCY 2500000
+
+// -------------------------------
+// ESP32-S3 SPI
+// -------------------------------
+
+#define USE_HSPI_PORT
+
+// -------------------------------
+// Display size
+// -------------------------------
+
+#define DISPLAY_W 480
+#define DISPLAY_H 320
+
+// -------------------------------
+// Fonts
+// -------------------------------
+
+#define LOAD_GLCD
+#define LOAD_FONT2
+#define LOAD_FONT4
+#define LOAD_FONT6
+#define LOAD_FONT7
+#define LOAD_FONT8
+#define LOAD_GFXFF
+#define SMOOTH_FONT
+
+// -------------------------------
+// Optional settings
+// -------------------------------
+
+//#define TFT_RGB_ORDER TFT_BGR
+//#define TFT_INVERSION_ON
+```
+
+---
+
+# ⚡ SPI Frequency Warning / SPI 주파수 경고
+
+너무 높은 SPI 속도는 ESP32-S3에서 다음 문제를 유발할 수 있습니다:
+Too high SPI frequency may cause:
+
+* 화면 깨짐 / Screen corruption
+* SD 카드 오류 / SD card errors
+* 부팅 실패 / Boot failure
+* 랜덤 크래시 / Random crashes
+* 시스템 멈춤 / System freeze
+
+추천 설정:
+Recommended setting:
+
+```cpp
+#define SPI_FREQUENCY 40000000
+```
+
+---
+
+# 🚀 시작 방법 / Getting Started
+
+## 1️⃣ Arduino IDE 설치
+
+Install Arduino IDE
+
+---
+
+## 2️⃣ ESP32 Board Package 설치
+
+Install ESP32 board package
+
+추천 버전:
+Recommended version:
+
+```text
+ESP32 Board Package 3.3.8
+```
+
+---
+
+## 3️⃣ PSRAM 활성화
+
+Enable PSRAM
+
+Arduino IDE 설정:
+
+```text
+PSRAM → Enabled
+```
+
+---
+
+## 4️⃣ Partition Scheme 설정
+
+Configure Partition Scheme
+
+추천 설정:
+
+```text
+16MB Flash
+```
+
+---
+
+## 5️⃣ 업로드
+
+Upload firmware to ESP32-S3
+
+---
+
+# 📁 디렉터리 구조 / Directory Structure
+
+```text
+/Ardudows
+├── System
+│   ├── Registry
+│   │   ├── User.asf
+│   │   ├── Network.asf
+│   │   ├── Setup.asf
+│   │   ├── Kernel.asf
+│   │   └── Boot.asf
+│   │
+│   ├── Driver
+│   │   ├── TFT.adf
+│   │   ├── SD.adf
+│   │   ├── RTC.adf
+│   │   └── Touch.adf
+│   │
+│   ├── Kernel
+│   │   ├── AFK
+│   │   │   └── Ardudows.akf
+│   │   │
+│   │   └── ATK
+│   │       └── Ardudows.akf
+│   │
+│   ├── Log
+│   │   ├── Boot.arf
+│   │   ├── Dump.arf
+│   │   ├── Output.arf
+│   │   ├── panic.arf
+│   │   ├── Hardware
+│   │   └── Software
+│   │
+│   ├── NetWork
+│   │   ├── config.anf
+│   │   └── NetCheck.anf
+│   │
+│   ├── Boot
+│   │   └── Boot.abf
+│   │
+│   ├── API
+│   │   └── API.asf
+│   │
+│   ├── Debug
+│   │   └── Debug.asf
+│   │
+│   ├── Setup
+│   │   └── Setup.asf
+│   │
+│   └── Firmware
+│       └── Firmware.asf
+│
+├── Users
+│   └── Administrator
+│       ├── Administrator.auf
+│       └── UserDATA
+│           └── UserDATA.auf
+│
+├── Programs
+│   ├── Programs_X16
+│   │   ├── Explorer
+│   │   ├── CMD
+│   │   ├── NotePad
+│   │   ├── Clock
+│   │   ├── Calculators
+│   │   └── Registry_Editer
+│   │
+│   └── Programs_X32
+│       └── Minecraft_Server
+│
+├── Assets
+│   ├── Image
+│   ├── Font
+│   ├── Sound
+│   └── Other
+│
+└── Licens
+    ├── ReadME.aif
+    └── Product.alf
+```
+
+---
+
+# 📖 파일 확장자 / File Extension Types
+
+| Extension | Description                     |
+| --------- | ------------------------------- |
+| `.asf`    | Ardudows System File            |
+| `.adf`    | Ardudows Driver File            |
+| `.akf`    | Ardudows Kernel File            |
+| `.apf`    | Ardudows Program File           |
+| `.arf`    | Ardudows Report / Log File      |
+| `.anf`    | Ardudows Network File           |
+| `.abf`    | Ardudows Boot File              |
+| `.auf`    | Ardudows User File              |
+| `.acf`    | Ardudows CD File                |
+| `.awf`    | Ardudows Weird / Easteregg File |
+
+---
+
+# 📊 시스템 리소스 사용량 / System Resource Usage
+
+현재 ESP32-S3 N16R8 기준 사용량:
+Current usage on ESP32-S3 N16R8:
+
+| Resource      | Usage           |
+| ------------- | --------------- |
+| Flash Usage   | ~3MB / 16MB     |
+| RAM Usage     | ~223KB / 327KB  |
+| Display       | 480x320 SPI TFT |
+| SPI Frequency | 40MHz           |
+| PSRAM         | Enabled         |
+
+---
+
+# ✅ 구현된 기능 / Implemented Features
+
+* [x] GUI System
+* [x] SD Card File System
+* [x] Registry System
+* [x] Wi-Fi Support
+* [x] BLE Support
+* [x] OTA Update
+* [x] USB Host
+* [x] Driver System
+* [x] Logging System
+* [x] Installer System
+* [x] Network System
+
+---
+
+# 🚧 예정 기능 / Planned Features
+
+* [ ] Audio System
+* [ ] Mouse Support
+* [ ] Multi-window GUI
+* [ ] Package Manager
+* [ ] Advanced Shell
+* [ ] App Store-style System
+* [ ] ArduCraft Experiment
+
+---
+
+# 🛠️ 문제 해결 / Troubleshooting
+
+## ⚠️ White Screen
+
+TFT 핀 설정을 확인하세요.
+Check TFT pin configuration.
+
+---
+
+## ⚠️ SD Card Error
+
+SD 카드 SPI 설정을 확인하세요.
+Check SD card SPI configuration.
+
+---
+
+## ⚠️ Boot Loop
+
+SPI 주파수를 낮춰보세요.
+Try lowering SPI frequency.
+
+---
+
+## ⚠️ USB Problems
+
+일부 USB 장치는 추가 전력이 필요할 수 있습니다.
+Some USB devices may require additional power.
 
 ---
 
@@ -291,5 +522,15 @@ windows10101713
 
 # 📜 라이선스 / License
 
-이 프로젝트는 학습, 개발 및 하드웨어 실험 목적으로 제작된 실험적 프로젝트입니다.
-This project is an experimental project intended for learning, development, and hardware experimentation purposes.
+이 프로젝트는 학습, 실험 및 개발 목적으로 제작되었습니다.
+This project is intended for learning, experimentation, and development purposes.
+
+---
+
+# ⭐ 프로젝트 상태 / Project Status
+
+> Experimental / Alpha Build
+> 실험적 알파 빌드
+
+> “ESP32-S3를 운영체제처럼 만들기 위한 실험.”
+> “An experiment to turn the ESP32-S3 into a computer-like operating system.”
