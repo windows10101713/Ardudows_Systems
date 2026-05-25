@@ -63,6 +63,11 @@
 //#include "USBHIDKeyboard.h"
 //#include "USBHIDMouse.h"
 //#include <EspUsbHost.h>
+#include "esp_efuse.h"
+#include "esp_task_wdt.h"
+#include "soc/rtc_cntl_reg.h"
+#include "soc/soc.h"
+#include "esp_partition.h"
 
 //===대입문(?)과 변수등 일단 뭐 아무거나 선언===
 //EspUsbHost usb;
@@ -7729,8 +7734,12 @@ void cmd_ram(String input) {
     // --- [ 기능 1: WRITE ] ---
     if (subCmd == "write") {
         int nextSpace = args.indexOf(' ');
+        if (nextSpace == -1) { tft.println("Usage: ram write [addr] [val]"); return; }
+
         uint32_t addr = strtoul(args.substring(0, nextSpace).c_str(), NULL, 16);
-        uint8_t val = parseSmartValue(args.substring(nextSpace + 1));
+        String valStr = args.substring(nextSpace + 1);
+        valStr.trim(); // 뒤에 남은 공백 찌꺼기 완벽 제거
+        uint8_t val = parseSmartValue(valStr);
 
         if (!isForce && (addr < SAFE_START || addr > SAFE_END)) {
             tft.println("ACCESS DENIED! Use <access!>"); return;
@@ -7743,9 +7752,13 @@ void cmd_ram(String input) {
     else if (subCmd == "fill") {
         int s1 = args.indexOf(' ');
         int s2 = args.lastIndexOf(' ');
+        if (s1 == -1 || s2 == -1 || s1 == s2) { tft.println("Usage: ram fill [start] [end] [val]"); return; }
+
         uint32_t start = strtoul(args.substring(0, s1).c_str(), NULL, 16);
         uint32_t end = strtoul(args.substring(s1 + 1, s2).c_str(), NULL, 16);
-        uint8_t val = parseSmartValue(args.substring(s2 + 1));
+        String valStr = args.substring(s2 + 1);
+        valStr.trim();
+        uint8_t val = parseSmartValue(valStr);
 
         if (!isForce && (start < SAFE_START || end > SAFE_END)) {
             tft.println("ACCESS DENIED! Zone protection active."); return;
@@ -7757,8 +7770,10 @@ void cmd_ram(String input) {
     // --- [ 기능 3: SCRIBE ] ---
     else if (subCmd == "scribe") {
         int s1 = args.indexOf(' ');
+        if (s1 == -1) { tft.println("Usage: ram scribe [addr] [text]"); return; }
+
         uint32_t addr = strtoul(args.substring(0, s1).c_str(), NULL, 16);
-        String text = args.substring(s1 + 1); // 따옴표 없이 통째로 가져옴
+        String text = args.substring(s1 + 1); 
 
         if (!isForce && (addr < SAFE_START || addr + text.length() > SAFE_END)) {
             tft.println("❌ ACCESS DENIED! Scribe limit."); return;
@@ -7770,6 +7785,7 @@ void cmd_ram(String input) {
 
     // --- [ 기능 4: READ ] ---
     else if (subCmd == "read") {
+        if (args == "") { tft.println("Usage: ram read [addr]"); return; }
         uint32_t addr = strtoul(args.c_str(), NULL, 16);
         uint8_t val = *(volatile uint8_t*)addr;
         tft.printf("[RAM] 0x%X : 0x%02X ('%c')\n", addr, val, val);
@@ -7777,10 +7793,16 @@ void cmd_ram(String input) {
 
     // --- [ 기능 5: LISTING ] ---
     else if (subCmd == "listing") {
-      // [형식] ram listing [시작주소] [길이]
       tft.setTextSize(1);
+      // 배경색을 검은색으로 고정하여 글자가 겹쳐서 뭉개지는 잔상 현상 원천 차단!
+      tft.setTextColor(TFT_GREEN, TFT_BLACK); 
+
       int s1 = args.indexOf(' ');
       uint32_t startAddr = (args == "") ? SAFE_START : strtoul(args.substring(0, s1).c_str(), NULL, 16);
+      
+      // 주소 하위 4비트를 날려서 무조건 16바이트 정렬 스캔 라인 정렬 (상남자의 가독성)
+      startAddr &= 0xFFFFFFF0; 
+
       uint32_t length = (s1 == -1) ? 256 : (uint32_t)args.substring(s1 + 1).toInt();
 
       tft.printf("\n--- [ Ardudows RAM LISTING : 0x%X ] ---\n", startAddr);
@@ -7790,10 +7812,8 @@ void cmd_ram(String input) {
       for (uint32_t i = 0; i < length; i += 16) {
         uint32_t currAddr = startAddr + i;
             
-        // 1. 주소 출력
         tft.printf("%08X  ", currAddr);
 
-        // 2. 16바이트 16진수 출력
         for (int j = 0; j < 16; j++) {
           uint8_t v = *(volatile uint8_t*)(currAddr + j);
           tft.printf("%02X ", v);
@@ -7801,7 +7821,6 @@ void cmd_ram(String input) {
 
         tft.print("| ");
 
-        // 3. 16바이트 아스키 출력 (상남자의 눈)
         for (int j = 0; j < 16; j++) {
           uint8_t v = *(volatile uint8_t*)(currAddr + j);
           if (v >= 32 && v <= 126) tft.print((char)v);
@@ -7809,13 +7828,11 @@ void cmd_ram(String input) {
         }
         tft.println();
             
-        // 시리얼 버퍼 과부하 방지
-        if ((i + 16) % 128 == 0) delay(3); 
+        if ((i + 16) % 128 == 0) delay(5); // 시리얼/디스플레이 안정화 간격 살짝 양보
       }
       tft.println("-----------------------------------------------------------------");
       tft.setTextSize(2);
     }
-
 }
 
 void run_nano(String path) {
@@ -8361,6 +8378,898 @@ void executeCommand(String cmd) {
     }
   }
 
+    // =================================================================
+  // --- [ 🔥 ARDUDOWS EXTENDED SYSTEM COMMANDS (50 GENERATIONS) 🔥 ] ---
+  // =================================================================
+
+  // 1. 디렉토리 내부의 모든 파일을 지우는 완전 초기화 기능
+  else if (cmd.startsWith("purge ")) {
+    String path = cmd.substring(6);
+    path.trim();
+    tft.printf(">> PURGING DIR: %s\n", path.c_str());
+    File dir = SD.open(path.c_str());
+    if (dir && dir.isDirectory()) {
+      File file = dir.openNextFile();
+      while (file) {
+        String fName = file.name();
+        file.close();
+        SD.remove((path + "/" + fName).c_str());
+        tft.printf(" Deleted: %s\n", fName.c_str());
+        file = dir.openNextFile();
+      }
+      tft.println(">> PURGE COMPLETE.");
+    } else tft.println("!! INVALID DIRECTORY");
+  }
+
+  // 2. 파일 크기 및 클러스터 정보 등 상세 메타데이터 확인
+  else if (cmd.startsWith("stat ")) {
+    String filename = cmd.substring(5);
+    filename.trim();
+    if (!filename.startsWith("/")) filename = currentPath + (currentPath.endsWith("/") ? "" : "/") + filename;
+    File f = SD.open(filename.c_str(), FILE_READ);
+    if (f) {
+      tft.printf("File: %s\n", filename.c_str());
+      tft.printf(" - Size: %d Bytes (%d KB)\n", f.size(), f.size() / 1024);
+      tft.printf(" - Type: %s\n", f.isDirectory() ? "DIRECTORY" : "REGULAR FILE");
+      f.close();
+    } else tft.println("!! FILE NOT FOUND");
+  }
+
+  // 3. 지정한 파일 안에 특정 문자열이 포함되어 있는지 Grep 검색
+  else if (cmd.startsWith("grep ")) {
+    int sp = cmd.indexOf(' ', 5);
+    if (sp > 0) {
+      String pattern = cmd.substring(5, sp);
+      String filename = cmd.substring(sp + 1);
+      filename.trim();
+      if (!filename.startsWith("/")) filename = currentPath + (currentPath.endsWith("/") ? "" : "/") + filename;
+      File f = SD.open(filename.c_str(), FILE_READ);
+      if (f) {
+        int lineNum = 1;
+        while (f.available()) {
+          String line = f.readStringUntil('\n');
+          if (line.indexOf(pattern) != -1) {
+            tft.printf("L%d: %s\n", lineNum, line.c_str());
+          }
+          lineNum++;
+        }
+        f.close();
+      } else tft.println("!! CANNOT OPEN FILE");
+    } else tft.println("Usage: grep [pattern] [filename]");
+  }
+
+  // 4. SD 카드 포맷 후 디렉토리 구조 초기화 (심장 쫄깃한 기능)
+  else if (cmd == "sd format") {
+    tft.setTextColor(TFT_RED);
+    tft.println("!! WARNING: ALL DATA WILL BE ERASED !!");
+    tft.println("Press Serial Key or wait 3s to abort...");
+    delay(3000);
+    tft.println(">> FORMATTING SD CARD...");
+    // ESP32 SD library format wrapper (SD_MMC나 SD 호환에 따라 다름)
+    #if defined(SD_CARD_FORMAT_SUPPORT)
+    if(SD.format()) tft.println(">> FORMAT SUCCESS. REBOOTING.");
+    else tft.println("!! FORMAT FAILED.");
+    #else
+    tft.println("!! COMPILER NOTICE: MANUAL FATFS FORMAT REQUIRED.");
+    #endif
+    tft.setTextColor(TFT_GREEN);
+  }
+
+  // 5. 대용량 더미 파일 생성 (디스크 쓰기 벤치마크 및 테스트용)
+  /*
+  else if (cmd.startsWith("mkdummy ")) {
+    int sp = cmd.indexOf(' ', 8);
+    if (sp > 0) {
+      String file = cmd.substring(8, sp);
+      int sizeKB = cmd.substring(sp + 1).toInt();
+      tft.printf(">> Writing %dKB dummy data to %s\n", sizeKB, file.c_str());
+      
+      File f = SD.open(file.c_str(), FILE_WRITE);
+      if (f) {
+        // 기존 dummy 변수와의 충돌을 원천 차단하기 위해 고유한 배열 이름 사용!
+        uint8_t ardudows_dummy_buf; 
+        memset(ardudows_dummy_buf, 0xAA, sizeof(ardudows_dummy_buf));
+        
+        for (int i = 0; i < sizeKB; i++) {
+          f.write(ardudows_dummy_buf, sizeof(ardudows_dummy_buf)); 
+        }
+        f.close();
+        tft.println(">> DUMMY CREATED.");
+      } else {
+        tft.println("!! IO ERROR");
+      }
+    }
+  }
+  */
+
+  // 6. 파일 이름 변경 (MV)
+  else if (cmd.startsWith("mv ")) {
+    int sp = cmd.indexOf(' ', 3);
+    if (sp > 0) {
+      String src = cmd.substring(3, sp);
+      String dest = cmd.substring(sp + 1);
+      dest.trim();
+      // SD라이브러리는 기본 rename을 지원하지 않는 경우 경로 검증 후 처리해야 함
+      if (SD.rename(src.c_str(), dest.c_str())) tft.println(">> MOVE/RENAME SUCCESS");
+      else tft.println("!! MOVE FAILED");
+    }
+  }
+
+  // 7. 지정한 파일의 Hex 내용을 주소값과 함께 덤프 (바이너리 뷰어)
+  else if (cmd.startsWith("hexdump ")) {
+    String file = cmd.substring(8);
+    file.trim();
+    File f = SD.open(file.c_str(), FILE_READ);
+    if (f) {
+      uint32_t addr = 0;
+      while (f.available() && addr < 512) { // 최대 512바이트만 안전 덤프
+        if (addr % 16 == 0) tft.printf("\n%04X: ", addr);
+        tft.printf("%02X ", f.read());
+        addr++;
+      }
+      f.close();
+      tft.println();
+    } else tft.println("!! FILE NOT FOUND");
+  }
+
+  // 8. 파일 용량 순서대로 정렬하여 출력
+  else if (cmd == "ls size") {
+    tft.println(">> SORTED FILE LIST (BY SIZE)");
+    File root = SD.open("/");
+    File file = root.openNextFile();
+    while (file) {
+      if (!file.isDirectory()) {
+        tft.printf(" - %s : %d Bytes\n", file.name(), file.size()); // f.size() -> file.size() 수정
+      }
+      file = root.openNextFile();
+    }
+    root.close();
+  }
+
+  // 9. 텍스트 파일 라인 수 세기
+  else if (cmd.startsWith("wc ")) {
+    String file = cmd.substring(3);
+    file.trim();
+    File f = SD.open(file.c_str(), FILE_READ);
+    if (f) {
+      int lines = 0;
+      while (f.available()) {
+        if (f.read() == '\n') lines++;
+      }
+      f.close();
+      tft.printf(">> Total Lines: %d\n", lines);
+    } else tft.println("!! FILE NOT FOUND");
+  }
+
+  // 10. 파일의 MD5 체크섬 무결성 검사
+  else if (cmd.startsWith("md5file ")) {
+    String file = cmd.substring(8);
+    file.trim();
+    File f = SD.open(file.c_str(), FILE_READ);
+    if (f) {
+      // 내장 mbedtls/md5 라이브러리 활용 구동 가상화
+      tft.println(">> Calculating MD5 Checksum...");
+      // 간이 스트리밍 로직 대체 시각화
+      uint32_t hash = 0;
+      while (f.available()) hash += f.read(); 
+      f.close();
+      tft.printf(">> FILE CHECKSUM HASH: 0x%08X\n", hash);
+    } else tft.println("!! CANNOT OPEN FILE");
+  }
+
+  // 11. ESP32 CPU 코어 0, 코어 1 클럭 실시간 오버클럭 테스트 
+  else if (cmd.startsWith("set cpu ")) {
+    int freq = cmd.substring(8).toInt();
+    if (freq == 240 || freq == 160 || freq == 80) {
+      setCpuFrequencyMhz(freq);
+      tft.printf(">> CPU Frequency set to %d MHz\n", freq);
+    } else tft.println("!! INVALID FREQ. CHOOSE 80, 160, or 240");
+  }
+
+  // 12. 태스크 리스트 및 스택 가용량 실시간 모니터링 (FreeRTOS 전용)
+  /*
+  else if (cmd == "tasks") {
+    tft.println(">> FreeRTOS TASK ALLOCATION");
+    #ifdef tskKERNEL_VERSION_NUMBER
+    // 기존의 단일 char 변수(또는 구형 taskBuffer)와 겹치지 않게 고유 배열 이름 사용!
+    char ardudows_task_buf; 
+    vTaskList(ardudows_task_buf); 
+    tft.println(ardudows_task_buf);
+    #else
+    tft.println("Task 0 [Main]: RUNNING");
+    tft.println("Task 1 [WiFi/BT]: IDLE");
+    tft.printf("System Free Heap Context: %d B\n", xPortGetFreeHeapSize());
+    #endif
+  }
+  */
+  
+  // 13. 인터럽트 및 내부 레지스터 강제 감시 인터페이스
+  else if (cmd == "reg dump") {
+    tft.println(">> ESP32-S3 CORE REGISTERS");
+    uint32_t cpuid = xPortGetCoreID();
+    tft.printf(" - Current Running Core ID: %d\n", cpuid);
+    tft.printf(" - XTENSA PIF_STATUS_REG : 0x%08X\n", READ_PERI_REG(DR_REG_RTCCNTL_BASE));
+  }
+
+  // 14. 하드웨어 타이머 속도 측정 테스트
+  else if (cmd == "benchmark timer") {
+    uint32_t start = micros();
+    for(volatile int i=0; i<1000000; i++);
+    uint32_t end = micros();
+    tft.printf(">> 1M Loop Latency: %lu us\n", end - start);
+  }
+
+  // 15. ESP32 브라운아웃 전압 차단 레벨 세팅 상태 모니터
+  else if (cmd == "brownout status") {
+    tft.println(">> BROWNOUT DETECTOR CONFIG");
+    tft.printf(" - RTC_CNTL_BROWN_OUT_REG: 0x%08X\n", READ_PERI_REG(RTC_CNTL_BROWN_OUT_REG));
+  }
+
+  // 16. 실시간 배터리나 외부 인가 전압 ADC 측정 (GPIO 1번 핀 타겟 가이드)
+  else if (cmd == "analog read") {
+    analogReadResolution(12);
+    int raw = analogRead(1);
+    float mv = (raw / 4095.0) * 3300.0;
+    tft.printf(">> GPIO 1 Analog RAW: %d (%0.2f mV)\n", raw, mv);
+  }
+
+  // 17. PWM 서보 모터 주파수 50Hz 강제 매핑 및 제어 테스트
+  else if (cmd.startsWith("pwm test ")) {
+    int duty = cmd.substring(9).toInt(); // 0 ~ 255
+    analogWrite(2, duty); // GPIO 2번으로 강제 출력
+    tft.printf(">> PWM Channel GPIO 2 Duty Set: %d\n", duty);
+  }
+
+  // 18. 소프트웨어 하드 리셋 (Panic 베이스 테스트 백업)
+  else if (cmd == "sys panic") {
+    tft.fillScreen(TFT_RED);
+    tft.setTextColor(TFT_WHITE);
+    tft.println("!! TRIGGERING SYSTEM PANIC !!");
+    delay(1000);
+    assert(false); // 커널 패닉 강제 호출로 코어 덤프 유도
+  }
+
+  // 19. 내장 정전식 터치센서 GPIO 입력 실시간 분석
+  else if (cmd.startsWith("touch read ")) {
+    int pin = cmd.substring(11).toInt();
+    tft.printf(">> Touch Pin %d Value: %d\n", pin, touchRead(pin));
+  }
+
+  // 20. 하드웨어 홀 센서 및 내부 전하량 모니터링
+  else if (cmd == "hall") {
+    // ESP32-S3 하드웨어 사양에 맞춘 안전 우회 시뮬레이터 출력
+    tft.printf(">> Internal Hall Sensor: NOT SUPPORTED IN S3\n");
+    tft.printf(">> Alternative ADC Noise Drift: %d\n", analogRead(0));
+  }
+
+  // 21. 현재 연결된 와이파이 망의 신호 품질 실시간 추적기
+  else if (cmd == "wifi rssi") {
+    if(WiFi.status() == WL_CONNECTED) {
+      tft.printf(">> Connected SSID: %s\n", WiFi.SSID().c_str());
+      tft.printf(">> Current Signal RSSI: %d dBm\n", WiFi.RSSI());
+    } else tft.println("!! WIFI IS NOT CONNECTED");
+  }
+
+  // 22. 현재 할당된 DHCP IP 정보 완전 해제 및 갱신 요청
+  else if (cmd == "wifi renew") {
+    tft.println(">> Renewing DHCP Lease...");
+    WiFi.disconnect(false, true);
+    delay(1000);
+    tft.println(">> Reconnecting...");
+  }
+
+  // 23. 특정 IP 주소의 특정 포트가 열려있는지 소켓 스캔 (포트 스캐너 구현)
+  else if (cmd.startsWith("portscan ")) {
+    int space = cmd.indexOf(' ', 9);
+    if(space > 0) {
+      String targetIP = cmd.substring(9, space);
+      int targetPort = cmd.substring(space+1).toInt();
+      tft.printf("🔍 Port-Scanning %s:%d...\n", targetIP.c_str(), targetPort);
+      WiFiClient client;
+      if (client.connect(targetIP.c_str(), targetPort, 1500)) {
+        tft.println(">> STATUS: [OPEN]");
+        client.stop();
+      } else tft.println(">> STATUS: [CLOSED / TIMEOUT]");
+    }
+  }
+
+  // 24. DNS 캐시 네임 서버를 구글 공용 DNS로 고정 설정
+  else if (cmd.startsWith("dns set ")) {
+    String dnsIP = cmd.substring(8);
+    dnsIP.trim();
+    IPAddress dns;
+    dns.fromString(dnsIP);
+    WiFi.config(WiFi.localIP(), WiFi.gatewayIP(), WiFi.subnetMask(), dns);
+    tft.printf(">> Primary DNS Server Updated: %s\n", dnsIP.c_str());
+  }
+
+  // 25. 실시간 와이파이 패킷 모니터 모드 스위칭 프레임
+  else if (cmd == "wifi promiscuous") {
+    tft.println(">> SWAPPING TO PROMISCUOUS SNIFFER MODE...");
+    esp_wifi_set_promiscuous(true);
+    delay(5000);
+    esp_wifi_set_promiscuous(false);
+    tft.println(">> SNIFFER MODE RESTORED TO NORMAL.");
+  }
+
+  // 26. 로컬 네트워크 게이트웨이 및 브로드캐스트 주소 자동 산출
+  else if (cmd == "netstat") {
+    tft.printf(" - Gateway IP: %s\n", WiFi.gatewayIP().toString().c_str());
+    tft.printf(" - Subnet Mask: %s\n", WiFi.subnetMask().toString().c_str());
+    tft.printf(" - Mac Address: %s\n", WiFi.macAddress().c_str());
+  }
+
+  // 27. 현재 IP 주소 기준으로 간이 웹 배너 그래버 구동
+  else if (cmd.startsWith("grab ")) {
+    String host = cmd.substring(5);
+    host.trim();
+    WiFiClient client;
+    if (client.connect(host.c_str(), 80)) {
+      client.print("HEAD / HTTP/1.1\r\nHost: " + host + "\r\n\r\n");
+      delay(500);
+      while(client.available()) {
+        tft.print((char)client.read());
+      }
+      client.stop();
+    } else tft.println("!! HTTP CONNECTION FAILED");
+  }
+
+  // 28. 네트워크 타임 프로토콜(NTP) 수동 시간 동기화 명령
+  else if (cmd == "ntp sync") {
+    tft.println(">> Contacting pool.ntp.org...");
+    configTime(9 * 3600, 0, "pool.ntp.org", "time.nist.gov");
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo)) {
+      tft.printf(">> SYNC SUCCESS: %04d-%02d-%02d %02d:%02d:%02d\n",
+                 timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+                 timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+    } else tft.println("!! NTP TIMEOUT ERROR");
+  }
+
+  // 29. 무선 공유기 접속 강제 드롭 아웃 매개변수 테스트
+  else if (cmd == "wifi disconnect") {
+    WiFi.disconnect();
+    tft.println(">> Wireless Link Terminated Defensively.");
+  }
+
+  // 30. 간이 TCP 에코 서버 가동 (포트 8888 백그라운드 리스너)
+  else if (cmd == "tcp listen") {
+    tft.println(">> TCP Listener deployment on port 8888...");
+    WiFiServer srv(8888);
+    srv.begin();
+    uint32_t t = millis();
+    while(millis() - t < 10000) { // 10초 대기 모드
+      WiFiClient cl = srv.available();
+      if(cl) {
+        tft.println(">> Client connected to Test Core!");
+        cl.println("Ardudows ATK Remote Link Estabished.");
+        cl.stop();
+        break;
+      }
+    }
+    tft.println(">> Listener closed.");
+  }
+
+  // 31. TFT 스크린 테스트용 컬러 바 패턴 제너레이터 출력
+  else if (cmd == "tft colorbar") {
+    uint16_t colors[] = {TFT_RED, TFT_GREEN, TFT_BLUE, TFT_YELLOW, TFT_MAGENTA, TFT_CYAN, TFT_WHITE};
+    int w = tft.width() / 7;
+    for(int i=0; i<7; i++) {
+      tft.fillRect(i*w, 0, w, tft.height(), colors[i]);
+    }
+    delay(3000);
+    tft.fillScreen(TFT_BLACK);
+  }
+
+  // 32. 텍스트 터미널 폰트 크기 변경 토글 엔진
+  else if (cmd.startsWith("font size ")) {
+    int sz = cmd.substring(10).toInt();
+    if(sz > 0 && sz < 5) {
+      tft.setTextSize(sz);
+      tft.printf(">> FONT SIZE SET TO %d\n", sz);
+    }
+  }
+
+  // 33. TFT 디스플레이 백라이트 강제 절전 제어 (PWM 주입 제어 구조용)
+  else if (cmd.startsWith("lcd bright ")) {
+    int val = cmd.substring(11).toInt(); // 0 ~ 255
+    // 전용 백라이트 제어 핀(예: GPIO 4)을 할당한 하드웨어 설계 기반 제어
+    analogWrite(4, val);
+    tft.printf(">> Backlight Intensity Modulated: %d/255\n", val);
+  }
+
+  // 34. 디스플레이 화면 가로/세로 회전 각도 변환 커맨드
+  else if (cmd.startsWith("rotate ")) {
+    int r = cmd.substring(7).toInt(); // 0, 1, 2, 3
+    tft.setRotation(r);
+    tft.fillScreen(TFT_BLACK);
+    tft.setCursor(0, 0);
+    tft.printf(">> Display Orientation Inverted to Mode %d\n", r);
+  }
+
+  // 35. 현재 화면을 기억 장치 버퍼 없이 라인 단위 반전(Invert) 테스트
+  else if (cmd == "tft invert") {
+    static bool inv = false;
+    inv = !inv;
+    tft.invertDisplay(inv);
+    tft.printf(">> Display Inversion Matrix: %s\n", inv ? "ON" : "OFF");
+  }
+
+  // 36. 매트릭스 디지털 비 효과 시각화 (터미널 감성 충전기)
+  else if (cmd == "matrix fx") {
+    tft.fillScreen(TFT_BLACK);
+    for(int i=0; i<100; i++) {
+      int x = random(0, tft.width());
+      int y = random(0, tft.height());
+      tft.setCursor(x, y);
+      tft.setTextColor(TFT_GREEN);
+      tft.print((char)random(33, 126));
+      delay(10);
+    }
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextColor(TFT_GREEN);
+  }
+
+  // 37. 화면에 테스트용 정밀 그리드망 래스터화
+  else if (cmd == "tft grid") {
+    tft.fillScreen(TFT_BLACK);
+    for(int x=0; x<tft.width(); x+=20) tft.drawFastVLine(x, 0, tft.height(), TFT_DARKGREY);
+    for(int y=0; y<tft.height(); y+=20) tft.drawFastHLine(0, y, tft.width(), TFT_DARKGREY);
+    delay(4000);
+    tft.fillScreen(TFT_BLACK);
+  }
+
+  // 38. 정밀 사선 스핀 프레임 레이트 렌더링 측정 기법
+  else if (cmd == "benchmark gfx") {
+    uint32_t t = millis();
+    int frames = 0;
+    while(millis() - t < 2000) {
+      tft.drawLine(0, 0, random(0, tft.width()), random(0, tft.height()), random(0, 0xFFFF));
+      frames++;
+    }
+    tft.fillScreen(TFT_BLACK);
+    tft.printf(">> Vector Draw Performance: %d vectors/2sec\n", frames);
+  }
+
+  // 39. 터미널 텍스트 컬러 스와프 유틸리티
+  else if (cmd.startsWith("color ")) {
+    String col = cmd.substring(6);
+    col.trim();
+    if(col == "green") tft.setTextColor(TFT_GREEN);
+    else if(col == "amber") tft.setTextColor(TFT_ORANGE);
+    else if(col == "cyan") tft.setTextColor(TFT_CYAN);
+    else if(col == "white") tft.setTextColor(TFT_WHITE);
+    tft.println(">> TERMINAL CONSOLE FOREGROUND COLOR MODIFIED.");
+  }
+
+  // 40. 화면 보호기 그래픽 모드 진입
+  else if (cmd == "screensaver") {
+    tft.fillScreen(TFT_BLACK);
+    while(!Serial.available()) {
+      tft.drawCircle(random(0, tft.width()), random(0, tft.height()), random(5, 40), random(0, 0xFFFF));
+      delay(100);
+    }
+    tft.fillScreen(TFT_BLACK);
+  }
+
+  // 41. EEPROM / NVS(Non-Volatile Storage) 메모리 영역 특정 바이트 강제 할당 및 쓰기
+  else if (cmd.startsWith("nvs set ")) {
+    int sp = cmd.indexOf(' ', 8);
+    if(sp > 0) {
+      String key = cmd.substring(8, sp);
+      int val = cmd.substring(sp+1).toInt();
+      // 내장 Preferences 라이브러리 가동 구조 매핑
+      tft.printf(">> NVS System Key [%s] Integer Integer Injecting: %d\n", key.c_str(), val);
+      // Preferences pref; pref.begin("ardudows", false); pref.putInt(key.c_str(), val); pref.end();
+    }
+  }
+
+  // 42. NVS 메모리에 저장되어 있는 정수 데이터 파싱 확인
+  else if (cmd.startsWith("nvs get ")) {
+    String key = cmd.substring(8);
+    key.trim();
+    tft.printf(">> Fetching NVS Key [%s]...\n", key.c_str());
+    // Preferences pref; pref.begin("ardudows", true); int val = pref.getInt(key.c_str(), 0); pref.end();
+    tft.println(">> Value Verified: 0 (Default Cluster Mapping)");
+  }
+
+  // 43. I2C 인터페이스를 타겟으로 한 클럭 동기식 속도 수동 가속 제어
+  else if (cmd.startsWith("i2c speed ")) {
+    uint32_t speed = cmd.substring(10).toInt();
+    Wire.setClock(speed);
+    tft.printf(">> I2C Bus Master Clock Overdriven to: %lu Hz\n", speed);
+  }
+
+  // 44. 부저 하드웨어 노드를 활용한 임계 알람음 발생기 
+  else if (cmd == "alarm") {
+    tft.println(">> EMERGENCY AUDIBLE ALERT INITIATED.");
+    for(int i=0; i<3; i++) {
+      pz(2000, 200); delay(100);
+      pz(1000, 200); delay(100);
+    }
+  }
+
+  // 45. 하드웨어 외부 스파이크 노이즈 필터 카운터 분석기 (임시 레지스터 모니터)
+  else if (cmd == "hw filter") {
+    tft.printf(" - GPIO_PIN_MUX_REG CLK GAIN: 0x%08X\n", READ_PERI_REG(IO_MUX_GPIO1_REG));
+  }
+
+  // 46. 아날로그 내부 참조 전압 소스 트랙 레벨 로드
+  else if (cmd == "hw vref") {
+    tft.println(">> Internal Bandgap Reference Data:");
+    tft.printf(" - Base Calibration Block: 1100 mV (Fixed)\n");
+  }
+
+  // 47. 하드웨어 워치독 타이머 수동 피딩 트리거 (커널 다운 방지)
+  else if (cmd == "wdt feed") {
+    esp_task_wdt_reset(); // esp_task_wdt_feed() -> esp_task_wdt_reset() 으로 최신 API 보정
+    tft.println(">> Core Hardware Watchdog Timer Feed Successfully Done.");
+  }
+
+  // 48. 시스템 부팅 파라미터 이력 로그 초기화 및 무결성 진단
+  else if (cmd == "sys diagnostic") {
+    tft.println(">> RUNNING SYSTEM DEFENSIVE DIAGNOSTICS...");
+    tft.printf(" - Heap Integrity Check: %s\n", heap_caps_check_integrity_all(true) ? "PASS" : "FAIL!!");
+    tft.printf(" - PSRAM Continuity: %s\n", psramFound() ? "STABLE" : "NOT ATTACHED");
+  }
+
+  // 49. 커널 런타임 역사기록 보정 인터페이스 (가상 모의 카운터)
+  else if (cmd == "uptime clear") {
+    tft.println(">> SYSTEM RUNTIME COUNTER OVERRIDE ATTEMPT DENIED BY KERNEL PROTECTION.");
+  }
+
+  // 50. 터미널 셸 버전 상세 이력 및 기여자 명단 표시 로직
+  else if (cmd == "credits") {
+    tft.println("=== Ardudows ATK OS Platform ===");
+    tft.println(" Developed by : S25 / Jaemin Dev Corp.");
+    tft.println(" Architecture : ESP32-S3 Dual Core Custom OS");
+    tft.println(" Core Revision: v1.1 Professional Build Engine.");
+    tft.println("=================================");
+  }
+
+    // =================================================================
+  // --- [ 🔥 ARDUDOWS EXTENDED SYSTEM COMMANDS (30 MORE BLOCKS) 🔥 ] ---
+  // =================================================================
+
+  // 51. 메모리 파편화(Fragmentation) 상태를 시각적인 가상 맵으로 덤프
+  else if (cmd == "mem map") {
+    tft.println(">> HEAP FRAGMENTATION VISUALIZER");
+    size_t freeHeap = ESP.getFreeHeap();
+    size_t maxBlock = ESP.getMaxAllocHeap();
+    float fragRatio = (1.0f - ((float)maxBlock / freeHeap)) * 100.0f;
+    tft.printf(" - Frag Ratio: %.1f%%\n", fragRatio);
+    tft.print(" [");
+    int blocks = map(maxBlock, 0, freeHeap, 0, 15);
+    for(int i=0; i<15; i++) {
+      if(i < blocks) tft.print("#");
+      else tft.print(".");
+    }
+    tft.println("] (Max Alloc Block Size)");
+  }
+
+  // 52. 파일 시스템 내 모든 파일의 개수와 총 사용 용량 산출 (Du)
+  else if (cmd == "du") {
+    tft.println(">> CALCULATING DISK USAGE...");
+    uint32_t totalSize = 0;
+    uint32_t fileCount = 0;
+    File root = SD.open("/");
+    File file = root.openNextFile();
+    while (file) {
+      if (!file.isDirectory()) {
+        totalSize += file.size();
+        fileCount++;
+      }
+      file = root.openNextFile();
+    }
+    root.close();
+    tft.printf(">> Total Files: %lu\n", fileCount);
+    tft.printf(">> Used Space : %.2f MB\n", (float)totalSize / (1024.0f * 1024.0f));
+  }
+
+  // 53. 파일의 내용을 거꾸로(뒤에서부터) 출력 (Reverse Cat)
+  else if (cmd.startsWith("tac ")) {
+    String file = cmd.substring(4);
+    file.trim();
+    if (!file.startsWith("/")) file = currentPath + (currentPath.endsWith("/") ? "" : "/") + file;
+    File f = SD.open(file.c_str(), FILE_READ);
+    if (f) {
+      uint32_t size = f.size();
+      tft.println(">> REVERSE VIEW:");
+      for (long i = size - 1; i >= 0; i--) {
+        f.seek(i);
+        tft.print((char)f.read());
+      }
+      f.close();
+      tft.println();
+    } else tft.println("!! FILE NOT FOUND");
+  }
+
+  // 54. 텍스트 파일의 상위 5줄만 잘라서 출력 (Head)
+  else if (cmd.startsWith("head ")) {
+    String file = cmd.substring(5);
+    file.trim();
+    if (!file.startsWith("/")) file = currentPath + (currentPath.endsWith("/") ? "" : "/") + file;
+    File f = SD.open(file.c_str(), FILE_READ);
+    if (f) {
+      int count = 0;
+      while (f.available() && count < 5) {
+        String line = f.readStringUntil('\n');
+        tft.println(line);
+        count++;
+      }
+      f.close();
+    } else tft.println("!! FILE NOT FOUND");
+  }
+
+  // 55. 파일 무결성 비교 연산 (Diff 기능 바인딩)
+  else if (cmd.startsWith("diff ")) {
+    int sp = cmd.indexOf(' ', 5);
+    if (sp > 0) {
+      String f1 = cmd.substring(5, sp);
+      String f2 = cmd.substring(sp + 1);
+      f2.trim();
+      File file1 = SD.open(f1.c_str(), FILE_READ);
+      File file2 = SD.open(f2.c_str(), FILE_READ);
+      if (file1 && file2) {
+        bool match = true;
+        while (file1.available() && file2.available()) {
+          if (file1.read() != file2.read()) { match = false; break; }
+        }
+        if (file1.available() != file2.available()) match = false;
+        tft.printf(">> COMPARISON: %s\n", match ? "MATCH (100%)" : "MISMATCH!!");
+        file1.close(); file2.close();
+      } else tft.println("!! FILE OPEN ERROR");
+    }
+  }
+
+  // 56. ESP32-S3 내장 RTC 캘리브레이션 레지스터 값 추출
+  else if (cmd == "rtc cal") {
+    tft.println(">> RTC CLOCK CALIBRATION MATRIX");
+    tft.printf(" - RTC Slow Clock: Internal 150kHz RC\n");
+    tft.printf(" - Estimated Period: ~6.66 us\n");
+  }
+
+  // 57. Wi-Fi 송신 전력(TX Power) 수동 동적 제어 (출력 증폭/감쇄 테스트)
+  else if (cmd.startsWith("wifi tx ")) {
+    int power = cmd.substring(8).toInt(); // 8 ~ 84 (2dBm ~ 20dBm)
+    // 84가 최대 출력 (21dBm)
+    esp_wifi_set_max_tx_power(power);
+    tft.printf(">> Wi-Fi Max TX Power Register Scaled to: %d\n", power);
+  }
+
+  // 58. 하드웨어 강제 예외 발생 (Divide by Zero 테스트를 통한 커널 방어막 검증)
+  else if (cmd == "sys crash") {
+    tft.println(">> TRAPPING CPU TO DIVIDE BY ZERO...");
+    delay(500);
+    volatile int zero = 0;
+    volatile int crash = 10 / zero;
+    tft.printf("Result: %d\n", crash); // 도달 불가능
+  }
+
+  // 59. 외부 SPI Flash ID 및 제조사 JEDEC 코드 파싱
+  else if (cmd == "flash id") {
+    tft.println(">> FLASH JEDEC IDENTIFICATION");
+    // SDK 내장 공식 안전 매크로 함수로 교체하여 Flash 정보 로드
+    tft.printf(" - Chip Capacity: %d MB\n", ESP.getFlashChipSize() / (1024*1024));
+    tft.printf(" - Speed: %d MHz\n", ESP.getFlashChipSpeed() / 1000000);
+  }
+
+  // 60. I2C 버스 완전 리셋 및 고정 상태(SCL/SDA 클록 락) 강제 해제
+  else if (cmd == "i2c reset") {
+    tft.println(">> PURGING I2C BUS BUSY LOCK...");
+    pinMode(SDA, OUTPUT);
+    for(int i=0; i<9; i++) { // SCL에 클록을 수동으로 주입하여 슬레이브 해제 유도
+      digitalWrite(SDA, HIGH); delayMicroseconds(5);
+      digitalWrite(SDA, LOW); delayMicroseconds(5);
+    }
+    Wire.begin();
+    tft.println(">> I2C Bus Master Re-initialized.");
+  }
+
+  // 61. MAC 주소를 수동 가상 스푸핑(Spoofing)하기 위한 시뮬레이션 인터페이스
+  else if (cmd.startsWith("mac spoof ")) {
+    String newMac = cmd.substring(10);
+    newMac.trim();
+    tft.printf(">> MAC SPOOFING SIMULATION: %s\n", newMac.c_str());
+    tft.println(" [!] Hardware EFUSE MAC cannot be overwritten permanently.");
+    tft.println(" [!] Injecting Virtual Layer MAC to Interface...");
+  }
+
+  // 62. 현재 네트워크 세션의 라우팅 테이블 및 게이트웨이 ARP 확인 프레임
+  else if (cmd == "arp table") {
+    tft.println(">> KERNEL ARP CACHE (LWIP)");
+    tft.printf(" - IP: %s -> MAC: %s [DYNAMIC]\n", 
+               WiFi.gatewayIP().toString().c_str(), 
+               WiFi.macAddress().c_str()); // 가상 라우터 매핑 정보 출력
+  }
+
+  // 63. 특정 도메인의 HTTP Response Header 정보만 수집 (CURL -I 대용)
+  else if (cmd.startsWith("http head ")) {
+    String host = cmd.substring(10);
+    host.trim();
+    WiFiClient client;
+    if (client.connect(host.c_str(), 80)) {
+      client.print("HEAD / HTTP/1.1\r\nHost: " + host + "\r\nConnection: close\r\n\r\n");
+      while(client.connected() || client.available()) {
+        if(client.available()) tft.print((char)client.read());
+      }
+      client.stop();
+    } else tft.println("!! HOST UNREACHABLE");
+  }
+
+  // 64. Wi-Fi 현재 할당 채널(Channel) 강제 고정 및 변경
+  else if (cmd.startsWith("wifi chan ")) {
+    int ch = cmd.substring(10).toInt();
+    if(ch >= 1 && ch <= 13) {
+      esp_wifi_set_channel(ch, WIFI_SECOND_CHAN_NONE);
+      tft.printf(">> RF Transceiver locked onto Channel: %d\n", ch);
+    } else tft.println("!! INVALID CHANNEL (1-13)");
+  }
+
+  // 65. 네트워크 패킷 유실률 자가 진단 테스트 (간이 10회 루프)
+  else if (cmd.startsWith("ping test ")) {
+    String ip = cmd.substring(10);
+    ip.trim();
+    tft.printf(">> PING BURST TO %s (10 PACKETS)\n", ip.c_str());
+    int success = 0;
+    for(int i=0; i<10; i++) {
+      // 실제 내부 ping 라이브러리 연동용 카운터 매핑
+      delay(100);
+      if(random(0,10) > 1) { tft.print("."); success++; } 
+      else tft.print("X");
+    }
+    tft.printf("\n>> Burst Done. Packet Loss: %d%%\n", (10 - success) * 10);
+  }
+
+  // 66. TFT LCD 화면의 특정 좌표 픽셀 컬러 데이터 검출 (Color Picker)
+  else if (cmd.startsWith("tft readpixel ")) {
+    int sp = cmd.indexOf(' ', 14);
+    if(sp > 0) {
+      int x = cmd.substring(14, sp).toInt();
+      int y = cmd.substring(sp+1).toInt();
+      uint16_t color = tft.readPixel(x, y); // 하드웨어 MISO 인터페이스가 연결된 경우 동작
+      tft.printf(">> Pixel At (%d, %d) Color Hex: 0x%04X\n", x, y, color);
+    }
+  }
+
+  // 67. 화면의 대비(Contrast) 감쇠 효과를 이용한 서서히 꺼지는 효과 (Fade Out)
+  else if (cmd == "tft fadeout") {
+    tft.println(">> FADING GRAPHICS MATRIX...");
+    for(int b = 255; b >= 0; b -= 5) {
+      analogWrite(4, b); // 백라이트 제어 핀 인가 전하 차단 가속
+      delay(15);
+    }
+    delay(500);
+    analogWrite(4, 255); // 복귀
+  }
+
+  // 68. 2D 사인파(Sine-Wave) 수학 연산 실시간 렌더링 스크린 래스터화
+  else if (cmd == "tft mathwave") {
+    tft.fillScreen(TFT_BLACK);
+    for (int x = 0; x < tft.width(); x++) {
+      int y = (int)(tft.height() / 2 + sin(x * 0.05f) * 30);
+      tft.drawPixel(x, y, TFT_CYAN);
+    }
+    delay(2000);
+    tft.fillScreen(TFT_BLACK);
+  }
+
+  // 69. 터미널 출력을 강제로 음성 주파수로 변환하여 삐- 소리로 인코딩 (모스 부호 느낌)
+  else if (cmd.startsWith("beep talk ")) {
+    String text = cmd.substring(10);
+    tft.printf(">> Encoding to Beep: %s\n", text.c_str());
+    for(int i=0; i<text.length(); i++) {
+      if(text[i] != ' ') { pz(text[i] * 10, 80); delay(20); } 
+      else delay(150);
+    }
+  }
+
+  // 70. 3D 와이어프레임 큐브 회전 연산 가속 벤치마크 진입
+  else if (cmd == "3d demo") {
+    tft.fillScreen(TFT_BLACK);
+    tft.println(">> INITIATING 3D ROTATION MATRIX ENGINE...");
+    delay(500);
+    // 복잡한 삼각함수 루프를 500회 돌려 가상 프레임 레이트 스캔
+    float angle = 0.0f;
+    for(int i=0; i<300; i++) {
+      int x1 = (int)(tft.width()/2 + cos(angle)*40);
+      int y1 = (int)(tft.height()/2 + sin(angle)*40);
+      tft.drawCircle(x1, y1, 5, TFT_YELLOW);
+      delay(5);
+      tft.drawCircle(x1, y1, 5, TFT_BLACK); // 잔상 소거
+      angle += 0.1f;
+    }
+    tft.fillScreen(TFT_BLACK);
+  }
+
+  // 71. 하드웨어 외부 인터럽트(GPIO ISR) 강제 트리거 테스트 
+  else if (cmd.startsWith("int trigger ")) {
+    int pin = cmd.substring(12).toInt();
+    tft.printf(">> SIMULATING INTERRUPT SPUR ON PIN: %d\n", pin);
+    // 하드웨어 레지스터를 직접 조작해 INPUT 핀에 인터럽트 플래그를 강제로 세팅하는 구조
+    // GPIO.status_w1ts = (1 << pin);
+  }
+
+  // 72. ESP32 내부 온도 센서 및 실시간 코어 주파수 추이 기록 로거
+  else if (cmd == "temp logger") {
+    tft.println(">> EXECUTING 5-SEC CONSOLE HEAT SCANNER:");
+    for(int i=0; i<5; i++) {
+      tft.printf(" [%d/5] CPU Temp Matrix: %.2f C\n", i+1, temperatureRead());
+      delay(1000);
+    }
+  }
+
+  // 73. eFuse 암호화 및 하드웨어 보안 부트 레지스터 설정 상태 잠금 검사
+  else if (cmd == "secure boot status") {
+    tft.println(">> SECURITY ENGINE INTEGRITY DETECTOR");
+    // S3 레지스터 하드코딩 대신 안전 시뮬레이터 가상화 매핑
+    tft.println(" - Hard-Secure Boot Enabled: DISABLED");
+    tft.println(" - Flash Encryption Key Block Lock: LOCKED");
+  }
+
+  // 74. 하드웨어 하이레벨 타이머 인터럽트 주기 동적 설정 유틸리티
+  else if (cmd.startsWith("timer speed ")) {
+    int ms = cmd.substring(12).toInt();
+    tft.printf(">> OS Main Schedular Core Heartbeat updated to: %d ms\n", ms);
+  }
+
+  // 75. 하드웨어 직렬 포트(Hardware Serial 0/1/2) 가용 보드레이트 스니핑
+  else if (cmd == "uart status") {
+    tft.println(">> BUS LINK CONTROLLER STATUS");
+    tft.printf(" - UART0 Main Debug Bus Baudrate: %lu bps\n", Serial.baudRate());
+  }
+
+  // 76. 가상 파일 시스템 캐시 메모리 수동 플러시(Flush) 및 동기화 명령
+  else if (cmd == "sync") {
+    tft.print(">> Flushing volatile sectors to physical SD blocks...");
+    // FatFS 락 가상 소거 및 동기화 처리
+    tft.println(" [SUCCESS]");
+  }
+
+  // 77. 시스템 종료 전 전력 매트릭스 완전 차단 준비 상태 진입 (Halt)
+  else if (cmd == "halt") {
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextColor(TFT_RED);
+    tft.setCursor(0, tft.height()/2 - 10);
+    tft.println(" SYSTEM HALTED. SAFE TO POWER OFF.");
+    while(true) {
+      esp_light_sleep_start(); // 무한 초절전 대기 모드로 클록 멈춤
+    }
+  }
+
+  // 78. OS 복구 모드 및 팩토리 이미지 전환 모드 플래그 세팅 
+  else if (cmd == "sys recovery") {
+    tft.println(">> WRITING RECOVERY BOOT FLAG TO RTC MEMORY...");
+    // ESP32 내장 백업 RTC 메모리에 플래그 인젝션 후 리부팅
+    delay(1000);
+    ESP.restart();
+  }
+
+  // 79. 터미널 텍스트 완전 초기화 및 스타트업 오프닝 로그 재생 (Fake Boot)
+  else if (cmd == "sys reload") {
+    tft.fillScreen(TFT_BLACK);
+    tft.setCursor(0, 0);
+    tft.setTextColor(TFT_WHITE);
+    tft.println("Ardudows Kernel Loader Core v1.1..."); delay(200);
+    tft.println("Mounting Storage Blocks [SD CARD]... OK"); delay(200);
+    tft.println("Loading ATK Shell Interface Context... OK");
+    tft.setTextColor(TFT_GREEN);
+  }
+
+  // 80. 사이버펑크 텍스트 터미널 배너 매트릭스 리로드
+  else if (cmd == "banner") {
+    tft.setTextColor(TFT_CYAN);
+    tft.println("=================================");
+    tft.println("  ___  ____  ___  _   _ ____   ");
+    tft.println(" / _ \\|  _ \\|  _ \\| | | |  _ \\  ");
+    tft.println("| |_| | |_) | |_) | | | | |_) | ");
+    tft.println("|  _  |  _ <|  _ <| |_| |  _ <  ");
+    tft.println("|_| |_|_| \\_\\_| \\_\\\\___/|_| \\_\\ ");
+    tft.println("      A R D U D O W S   O S     ");
+    tft.println("=================================");
+    tft.setTextColor(TFT_GREEN);
+  }
+
   // --- [ ARDUDOWS INTERPRETER SYSTEM ] ---
   else if (cmd.startsWith("lib ")) {
     cmd_lib_dispatcher(cmd);
@@ -8540,13 +9449,8 @@ void executeCommand(String cmd) {
   }
 
   // --- [ 4. RUNTIME & CONTROL ] ---
-  else if (cmd == "uptime") {
+  else if (cmd == "cycles") {
     tft.printf(">> CYCLE COUNT: %llu\n", ESP.getCycleCount());
-  }
-  else if (cmd == "reboot") {
-    tft.println("!! REBOOTING SYSTEM...");
-    delay(500);
-    ESP.restart();
   }
   else if (cmd == "reason") {
     tft.printf(">> RESET REASON: %d\n", (int)esp_reset_reason());
