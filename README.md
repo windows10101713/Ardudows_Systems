@@ -161,6 +161,11 @@ Ardudows Systems uses many libraries and low-level ESP32 features.
 #include "usb/usb_host.h"
 #include "esp_intr_alloc.h"
 #include "esp_log.h"
+#include "esp_efuse.h"
+#include "esp_task_wdt.h"
+#include "soc/rtc_cntl_reg.h"
+#include "soc/soc.h"
+#include "esp_partition.h"
 ```
 
 ---
