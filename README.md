@@ -519,9 +519,9 @@ Some USB devices may require additional power.
 
 # 👨‍💻 제작자 / Author
 
-*windows10101713
-*Chat GPT
-*Gemini
+* windows10101713
+* Chat GPT
+* Gemini
 
 ---
 
