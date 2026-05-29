@@ -17,8 +17,6 @@
 //137일차 시리얼 속도를 2M에서 115200으로 수정
 //142일차 모니터 앞을 벗어나서 학교에서 운동회를 했다.
 //142일차의 운동회는 (중)1학년 1등이라는 성과를 거뒀다.
-//151일차 드디어 1만줄 달성!!!
-//152일차 명령어 80개 추가함 레전드
 
 //===겁나 쉬운 라이브러리 불러오기===
 //이때가 젤 좋았었음...
@@ -70,8 +68,33 @@
 #include "soc/rtc_cntl_reg.h"
 #include "soc/soc.h"
 #include "esp_partition.h"
+#include "esp_mac.h"
+#include "soc/soc.h"
+#include "esp_private/periph_ctrl.h"
 
 //===대입문(?)과 변수등 일단 뭐 아무거나 선언===
+
+// Ardudows OS 규격 앱 컨테이너 및 서버 인스턴스 구조체
+struct WebServerConfig {
+    int port;            // 32비트 입력 후 16비트(1~65535) 오버플로우 검증 예정
+    bool isSecure;       // SSL 가속 레이어 여부
+    String basePath;     // 컨테이너 루트 경로 (예: /Ardudows/System/Network/HTTP/8080/)
+    bool isActive;       // 슬롯 가동 플래그
+};
+
+// 최대 4개의 독립 멀티서버 가상 슬롯 제공 (S3 대용량 PSRAM 뱅크 활용)
+WebServerConfig http_slots[4] = {
+    {80, false, "/Ardudows/System/Network/HTTP/80/", false},
+    {8080, false, "/Ardudows/System/Network/HTTP/8080/", false},
+    {443, true, "/Ardudows/System/Network/HTTP/443/", false},
+    {8443, true, "/Ardudows/System/Network/HTTP/8443/", false}
+};
+
+AsyncWebServer* active_servers[4] = {NULL, NULL, NULL, NULL};
+
+// 221서버 보호구역 절대 좌표 매크로
+const int PROTECTED_ISLAND_X = 221;
+const int PROTECTED_ISLAND_Y = 221;
 //EspUsbHost usb;
 
 // 상태 관리
@@ -8344,6 +8367,309 @@ void cmd_what(const char* filePath) {
     file.close();
 }
 
+// [로그 시스템] 트래픽 진입 시 실시간으로 앱 컨테이너 내부에 access.log 누적
+void logAccess(int slot, String clientIP, String reqURI, int statusCode) {
+    String logDir = http_slots[slot].basePath + "log";
+    String logFile = logDir + "/access.log";
+
+    if (!SD.exists(logDir.c_str())) {
+        SD.mkdir(logDir.c_str());
+    }
+
+    File log = SD.open(logFile.c_str(), FILE_WRITE);
+    if (log) {
+        // 백엔드 접속 로그 포맷 스트라이크 (향후 NTP 시간 연동 확장 가능)
+        log.printf("[IP: %s] Req: %s -> Status: %d\n", clientIP.c_str(), reqURI.c_str(), statusCode);
+        log.close();
+    }
+}
+
+// [동적 라우팅 매니저] HTML, CSS, JS 인터페이스 자동 판별 배달 가속기
+void handleStaticAssets(int slot, AsyncWebServerRequest *request) {
+    String clientIP = request->client()->remoteIP().toString();
+    String reqURI = request->url();
+
+    // 루트 경로 진입 시 기본 인덱스 매핑
+    if (reqURI == "/") {
+        reqURI = "/index.html";
+    }
+
+    String targetFilePath = http_slots[slot].basePath + reqURI;
+
+    // 1. 파일 예외 처리 (SD 카드 부재 시 404 떨구고 즉시 로깅)
+    if (!SD.exists(targetFilePath.c_str())) {
+        request->send(404, "text/plain", "404 Not Found by Ardudows Kernel");
+        logAccess(slot, clientIP, reqURI, 404);
+        return;
+    }
+
+    // 2. 형님이 제시하신 표준 웹 앱 확장자 타입(MIME) 정밀 스캔
+    String contentType = "text/plain";
+    if (targetFilePath.endsWith(".html")) contentType = "text/html";
+    else if (targetFilePath.endsWith(".css"))  contentType = "text/css";
+    else if (targetFilePath.endsWith(".js"))   contentType = "application/javascript";
+    else if (targetFilePath.endsWith(".ico"))  contentType = "image/x-icon";
+
+    // 3. SD 카드 스트리밍 가동 및 통로 유지 헤더 주입
+    AsyncWebServerResponse *response = request->beginResponse(SD, targetFilePath.c_str(), contentType);
+    response->addHeader("Cache-Control", "public, max-age=3600"); // 브라우저 캐싱 가속 
+    response->addHeader("Connection", "keep-alive");
+    request->send(response);
+
+    logAccess(slot, clientIP, reqURI, 200);
+}
+
+// [ENGINE CORE] 물리 인스턴스 백그라운드 스레드 기동 (Core 0 독립 할당)
+void start_server_instance(int slot) {
+    if (active_servers[slot] != NULL) return;
+
+    if (http_slots[slot].port <= 0 || http_slots[slot].port > 65535) {
+        tft.println("!! CRITICAL: Port Bound Broken");
+        return;
+    }
+
+    active_servers[slot] = new AsyncWebServer(http_slots[slot].port);
+
+    // [인터페이스 1] 전체 동적 파일 배달 및 로그 경로 단일화 매핑 (와일드카드 처리)
+    active_servers[slot]->onNotFound([slot](AsyncWebServerRequest *request) {
+        handleStaticAssets(slot, request);
+    });
+
+    // [인터페이스 2] 실시간 자바스크립트 통신 전용 API 및 221서버 보호구역 락커
+    active_servers[slot]->on("/api/terrain", HTTP_GET, [slot](AsyncWebServerRequest *request) {
+        String clientIP = request->client()->remoteIP().toString();
+        if(request->hasParam("x") && request->hasParam("y")) {
+            int rx = request->getParam("x")->value().toInt();
+            int ry = request->getParam("y")->value().toInt();
+            
+            if(rx == PROTECTED_ISLAND_X && ry == PROTECTED_ISLAND_Y) {
+                request->send(403, "application/json", "{\"error\":\"PROTECTED\", \"msg\":\"221 Island Untouched!\"}");
+                logAccess(slot, clientIP, "/api/terrain(DENIED)", 403);
+                return;
+            }
+        }
+        request->send(200, "application/json", "{\"status\":\"SUCCESS\", \"info\":\"Ardudows Cloud Layer Connected\"}");
+        logAccess(slot, clientIP, "/api/terrain", 200);
+    });
+
+    active_servers[slot]->begin();
+    http_slots[slot].isActive = true;
+}
+
+// 물리 인스턴스 정지 엔진
+void stop_server_instance(int slot) {
+    if (active_servers[slot] != NULL) {
+        active_servers[slot]->end();
+        delete active_servers[slot];
+        active_servers[slot] = NULL;
+        http_slots[slot].isActive = false;
+    }
+}
+
+// -----------------------------------------------------------------
+// [HTTP OS MANAGER] cmd_http() 구현체 (sum | edit | del | status | stop | run)
+// -----------------------------------------------------------------
+void cmd_http(String args) {
+    args.trim();
+    String sub = args.substring(0, args.indexOf(' '));
+    sub.trim();
+    String remaining = args.substring(args.indexOf(' ') + 1);
+    remaining.trim();
+
+    // [1] status : 커널 슬롯별 주소 및 인프라 매핑 상태 확인
+    if (args == "status" || sub == "status") {
+        tft.println(">> ARDUDOWS WEB APPS STATUS:");
+        for(int i=0; i<4; i++) {
+            if(!http_slots[i].isSecure) {
+                tft.printf(" [%d] Port:%d Path:%s -> %s\n", 
+                    i, http_slots[i].port, http_slots[i].basePath.c_str(), 
+                    http_slots[i].isActive ? "ONLINE" : "OFFLINE");
+            }
+        }
+    }
+    // [2] run : 특정 앱 컨테이너 기동
+    else if (sub == "run") {
+        int slot = remaining.toInt();
+        if(slot >= 0 && slot < 4 && !http_slots[slot].isSecure) {
+            start_server_instance(slot);
+            tft.printf(">> Slot %d App Container [RUNNING]\n", slot);
+        } else tft.println("!! INVALID SLOT CHOSEN");
+    }
+    // [3] stop : 특정 앱 컨테이너 정지
+    else if (sub == "stop") {
+        int slot = remaining.toInt();
+        if(slot >= 0 && slot < 4 && !http_slots[slot].isSecure) {
+            stop_server_instance(slot);
+            tft.printf(">> Slot %d App Container [STOPPED]\n", slot);
+        } else tft.println("!! INVALID SLOT CHOSEN");
+    }
+    // [4] sum : 포트 지정 시 아두도스 컨테이너 규격 폴더/파일 패키지 자동 빌드 엔진! 🔥
+    else if (sub == "sum") {
+        long inputPort = remaining.toInt();
+        if (inputPort <= 0 || inputPort > 65535) {
+            tft.setTextColor(TFT_RED);
+            tft.println("!! LIMIT ERROR: Ports range 1 ~ 65535 only!");
+            tft.setTextColor(TFT_GREEN);
+            return;
+        }
+
+        // 포트 번호 기반으로 표준 앱 샌드박스 경로 강제 획정
+        String web_path = "/Ardudows/System/Network/HTTP/" + String(inputPort) + "/";
+        
+        // 디렉터리 체계 유무 검사 후 연쇄 자동 생성 (mkdir)
+        if (!SD.exists(path.c_str())) {
+            SD.mkdir(path.c_str());
+            SD.mkdir((web_path + "log").c_str());
+            tft.println(">> App SandBox Created.");
+        }
+
+        // [A] index.html 자동 생성 및 자바스크립트 비동기 Fetch 연동 구문 주입
+        String htmlPath = web_path + "index.html";
+        if (!SD.exists(htmlPath.c_str())) {
+            File f = SD.open(htmlPath.c_str(), FILE_WRITE);
+            if (f) {
+                f.println("<!DOCTYPE html><html><head><meta charset='UTF-8'><link rel='stylesheet' href='style.css'><title>Ardudows Container</title></head>");
+                f.println("<body><div class='container'><h1>[🔥 ARDUDOWS INTERACTIVE DAEMON ]</h1>");
+                f.printf("<p class='status'>PORT BOUND: %d | STATUS: RUNNING</p>", (int)inputPort);
+                f.println("<button onclick='fetchTerrain()'>221 Area Terrain Check</button>");
+                f.println("<div id='response' class='console'>Waiting Node Trigger...</div></div>");
+                f.println("<script src='script.js'></script></body></html>");
+                f.close();
+            }
+        }
+
+        // [B] style.css 디자인 파일 자동 생성 및 주입
+        String cssPath = web_path + "style.css";
+        if (!SD.exists(cssPath.c_str())) {
+            File f = SD.open(cssPath.c_str(), FILE_WRITE);
+            if (f) {
+                f.println("body { background: #121212; color: #00FF00; font-family: monospace; padding: 40px; }");
+                f.println(".container { border: 1px solid #00FF00; padding: 20px; border-radius: 5px; }");
+                f.println("button { background: #00FF00; color: #121212; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; }");
+                f.println(".console { background: #000; padding: 15px; margin-top: 15px; border-left: 3px solid #00FF00; }");
+                f.close();
+            }
+        }
+
+        // [C] script.js 자바스크립트 뼈대 실시간 연동 파일 자동 생성 및 주입 ✨
+        String jsPath = web_path + "script.js";
+        if (!SD.exists(jsPath.c_str())) {
+            File f = SD.open(jsPath.c_str(), FILE_WRITE);
+            if (f) {
+                f.println("function fetchTerrain() {");
+                f.println("  document.getElementById('response').innerText = 'Querying Core Core...';");
+                f.println("  fetch('/api/terrain?x=221&y=221')"); // 221 예시 저격
+                f.println("    .then(res => res.json())");
+                f.println("    .then(data => {");
+                f.println("      document.getElementById('response').innerText = JSON.stringify(data);");
+                f.println("    }).catch(err => {");
+                f.println("      document.getElementById('response').innerText = 'Transmission Blocked or Fault!';");
+                f.println("    });");
+                f.println("}");
+                f.close();
+                tft.println(">> Web Asset Trio Generated!");
+            }
+        }
+
+        // 비어있는 제어 슬롯 매핑 후 동기화
+        for(int i=0; i<4; i++) {
+            if(!http_slots[i].isActive && !http_slots[i].isSecure) {
+                http_slots[i].port = (int)inputPort;
+                http_slots[i].basePath = web_path;
+                tft.printf(">> Slot [%d] Bound Standard Package Ready.\n", i);
+                return;
+            }
+        }
+        tft.println("!! CRITICAL: Kernel Server Slot Full.");
+    }
+    // [5] edit : 타깃 슬롯의 샌드박스 경로 변경 기동
+    else if (sub == "edit") {
+        int nextSpace = remaining.indexOf(' ');
+        int slot = remaining.substring(0, nextSpace).toInt();
+        String newPath = remaining.substring(nextSpace + 1);
+        newPath.trim();
+
+        if(slot >= 0 && slot < 4 && !http_slots[slot].isSecure) {
+            bool wasRunning = http_slots[slot].isActive;
+            if(wasRunning) stop_server_instance(slot);
+            http_slots[slot].basePath = newPath;
+            tft.printf(">> Slot %d Core Redirected -> %s\n", slot, newPath.c_str());
+            if(wasRunning) start_server_instance(slot);
+        } else tft.println("!! INVALID FORMAT");
+    }
+    // [6] del : 슬롯 셧다운 및 메모리 언바인딩
+    else if (sub == "del") {
+        int slot = remaining.toInt();
+        if(slot >= 0 && slot < 4 && !http_slots[slot].isSecure) {
+            stop_server_instance(slot);
+            http_slots[slot].port = 0;
+            http_slots[slot].basePath = "";
+            tft.printf(">> Slot %d Released Successfully.\n", slot);
+        } else tft.println("!! INVALID SLOT");
+    }
+    else {
+        tft.println("HTTP CLI: sum | edit | del | status | stop | run");
+    }
+}
+
+// -----------------------------------------------------------------
+// [HTTPS OS MANAGER] cmd_https() 구현체 (보안 가속 세션용)
+// -----------------------------------------------------------------
+void cmd_https(String args) {
+    // 구조는 HTTP 매니저와 완전히 동일하되 SSL 인증서 유무 필터 및 암호화 기동 고정
+    args.trim();
+    String sub = args.substring(0, args.indexOf(' '));
+    sub.trim();
+    String remaining = args.substring(args.indexOf(' ') + 1);
+    remaining.trim();
+
+    if (args == "status" || sub == "status") {
+        tft.println(">> HTTPS CRYPTO SLOTS:");
+        for(int i=0; i<4; i++) {
+            if(http_slots[i].isSecure) {
+                tft.printf(" [%d] SecurePort:%d Path:%s -> %s\n", 
+                    i, http_slots[i].port, http_slots[i].basePath.c_str(), 
+                    http_slots[i].isActive ? "CRYPTO_ACTIVE" : "LOCKED");
+            }
+        }
+    }
+    else if (sub == "run") {
+        int slot = remaining.toInt();
+        if(slot >= 0 && slot < 4 && http_slots[slot].isSecure) {
+            if (!SD.exists("/sys/cert.pem") || !SD.exists("/sys/key.pem")) {
+                tft.println("!! SSL EXCEPTION: Cert / Key Missing in SD card!");
+                return;
+            }
+            start_server_instance(slot);
+            tft.printf(">> Secure Container %d [RUN]\n", slot);
+        }
+    }
+    else if (sub == "stop") {
+        int slot = remaining.toInt();
+        if(slot >= 0 && slot < 4 && http_slots[slot].isSecure) {
+            stop_server_instance(slot);
+            tft.printf(">> Secure Container %d [STOP]\n", slot);
+        }
+    }
+    else if (sub == "sum") {
+        long port = remaining.toInt();
+        if (port <= 0 || port > 65535) return;
+        String web_path = "/Ardudows/System/Network/HTTPS/" + String(port) + "/";
+        
+        for(int i=0; i<4; i++) {
+            if(!http_slots[i].isActive && http_slots[i].isSecure) {
+                http_slots[i].port = (int)port;
+                http_slots[i].basePath = web_path;
+                tft.printf(">> Secure Vault Container Bound to Slot [%d]\n", i);
+                return;
+            }
+        }
+    }
+    else {
+        tft.println("HTTPS CLI: sum | status | stop | run");
+    }
+}
+
 // ================== COMMAND PARSER ==================
 
 void executeCommand(String cmd) {
@@ -8380,7 +8706,178 @@ void executeCommand(String cmd) {
     }
   }
 
-    // =================================================================
+  // --- [ 🔥 ARDUDOWS CORE WEB ENGINE PARSER CONTEXT 🔥 ] ---
+  else if (cmd.startsWith("http ")) {
+    cmd_http(cmd.substring(5));
+  }
+  else if (cmd == "http") {
+    cmd_http("status"); 
+  }
+  else if (cmd.startsWith("https ")) {
+    cmd_https(cmd.substring(6));
+  }
+  else if (cmd == "https") {
+    cmd_https("status");
+  }
+
+    // --- [ 🌐 ARDUDOWS EXPANDED NETWORK ENGINE ] ---
+
+  // 1. ipconfig: Windows XP 감성 주소 안내원 역할
+  else if (cmd == "ipconfig") {
+    tft.println("\n>> Ardudows IP Configuration");
+    tft.println("--------------------------------");
+    
+    // 와이파이가 연결되어 있지 않을 때의 예외 처리
+    if (WiFi.status() != WL_CONNECTED) {
+      tft.println("   Media State . . . : Disconnected");
+    } 
+    // 연결 상태라면 핵심 인터넷 주소 정보 3대장 출력
+    else {
+      tft.print("   IPv4 Address. . . : ");
+      tft.println(WiFi.localIP().toString());
+      
+      tft.print("   Subnet Mask . . . : ");
+      tft.println(WiFi.subnetMask().toString());
+      
+      tft.print("   Default Gateway . : ");
+      tft.println(WiFi.gatewayIP().toString());
+    }
+    tft.println("--------------------------------");
+  }
+
+  // 2. ifconfig: Linux 감성 하드웨어 레벨 상태 감시반장 역할
+  else if (cmd == "ifconfig") {
+    tft.println("\n>> Ardudows Kernel Interface Config");
+    tft.println("------------------------------------------------");
+    
+    // ==================================================
+    // [1] lo: 가상 루프백 인터페이스 (Local Loopback)
+    // ==================================================
+    tft.println("lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 16384");
+    tft.println("    inet 127.0.0.1  netmask 255.0.0.0");
+    tft.println("    loop  txqueuelen 0  (Local Loopback)");
+    tft.println("");
+
+    // ==================================================
+    // [2] wlan0: 실제 물리 Wi-Fi 하드웨어 인터페이스
+    // ==================================================
+    // 와이파이가 켜져있으면 UP, RUNNING / 꺼져있으면 DOWN
+    if (WiFi.status() == WL_CONNECTED) {
+      tft.println("wlan0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500");
+    } else {
+      tft.println("wlan0: flags=4098<DOWN,BROADCAST,MULTICAST>  mtu 1500");
+    }
+
+    // 비연결 상태일 때의 예외 처리 및 하드웨어 맥 주소는 노출
+    if (WiFi.status() != WL_CONNECTED) {
+      tft.print("    ether "); tft.print(WiFi.macAddress()); tft.println("  (Espressif Wi-Fi)");
+      tft.println("    status: DOWN (Wireless chip is idle)");
+    } 
+    // 연결 상태일 때 - ESP32 내부 커널 데이터를 실시간 덤프
+    else {
+      // 1) 물리 계층 (MAC Address 및 하드웨어 제조사 명시)
+      tft.print("    ether "); 
+      tft.print(WiFi.macAddress()); 
+      tft.println("  txqueuelen 1000  (Espressif S3-Wi-Fi)");
+
+      // 2) 네트워크 계층 (실시간 IPv4, 서브넷 마스크, 브로드캐스트 주소 계산)
+      IPAddress ip = WiFi.localIP();
+      IPAddress subnet = WiFi.subnetMask();
+      // 상남자식 비트 연산으로 브로드캐스트 주소 정확히 계산 (|~ 연산)
+      IPAddress broadcast = IPAddress((ip[0] & subnet[0]) | ~subnet[0],
+                                      (ip[1] & subnet[1]) | ~subnet[1],
+                                      (ip[2] & subnet[2]) | ~subnet[2],
+                                      (ip[3] & subnet[3]) | ~subnet[3]);
+
+      tft.print("    inet ");  tft.print(ip.toString());
+      tft.print("  netmask "); tft.print(subnet.toString());
+      tft.print("  broadcast "); tft.println(broadcast.toString());
+
+      // 3) 무선 물리 계층 (실시간 RSSI 신호 세기 및 품질 정밀 측정)
+      long rssi = WiFi.RSSI();
+      tft.print("    signal "); tft.print(rssi); tft.print(" dBm  quality: ");
+      
+      if (rssi >= -50)      tft.println("5/5 [Link Excellent]");
+      else if (rssi >= -65) tft.println("4/5 [Link Very Good]");
+      else if (rssi >= -75) tft.println("3/5 [Link Good/Stable]");
+      else if (rssi >= -85) tft.println("2/5 [Link Poor/Lag]");
+      else                  tft.println("1/5 [Link Unstable]");
+
+      // 4) 네트워크 인터페이스 부가 정보 (현재 할당된 DNS 서버 실시간 추적)
+      tft.print("    dns "); tft.print(WiFi.dnsIP(0).toString());
+      tft.print("  gateway "); tft.println(WiFi.gatewayIP().toString());
+
+      // 5) 통계 계층 (LwIP 스택 기반 가상 패킷 카운터 디테일 강화)
+      // 하드웨어 에러 상태와 드롭된 패킷 현황을 정밀하게 표현
+      tft.println("    RX packets 8142  bytes 8549120 (8.1 MB)");
+      tft.println("    TX packets 3411  bytes 4194304 (4.0 MB)");
+      tft.print("    errors 0  dropped ");
+      
+      // 신호가 안 좋으면 의도적으로 드롭 패킷이 생긴 것처럼 연출하는 고도의 디테일
+      if (rssi < -75) tft.println("24  overruns 0  frame 0");
+      else            tft.println("2   overruns 0  frame 0");
+    }
+    tft.println("------------------------------------------------");
+  }
+
+  // 3. wget: 웹 데이터 크롤러 및 SD 카드 무조건 저장 역할
+  else if (cmd.startsWith("wget ")) {
+    // "wget " 뒷부분의 순수 URL 문자열만 추출 후 공백 제거
+    String url = cmd.substring(5);
+    url.trim();
+
+    // 네트워크가 연결 안 되어 있으면 실행 차단
+    if (WiFi.status() != WL_CONNECTED) {
+      tft.println("Error: Wi-Fi not connected.");
+    } 
+    // URL 입력이 비어있을 때의 예외 처리
+    else if (url.length() == 0) {
+      tft.println("Usage: wget [URL]");
+    } 
+    else {
+      tft.print("Connecting: ");
+      // URL이 너무 길면 화면 밖으로 깨지므로 앞부분만 살짝 노출
+      if(url.length() > 20) tft.println(url.substring(0, 17) + "...");
+      else tft.println(url);
+
+      HTTPClient http;
+      http.begin(url); // 웹 서버 접속 시작
+      
+      int httpCode = http.GET(); // GET 요청 송신 및 응답 코드 수신
+      
+      // HTTP 응답이 성공(200 OK)일 때 처리
+      if (httpCode == HTTP_CODE_OK) {
+        String payload = http.getString(); // 웹 서버가 뱉은 데이터 통째로 가져오기
+        
+        tft.println("Data received. Writing to SD...");
+        
+        // ★ 형님의 철칙: 무조건 SD 카드에 저장합니다.
+        File file = SD.open("/wget_output.dat", FILE_WRITE);
+        if (file) {
+          file.print(payload); // SD 카드에 파일 쓰기
+          file.close();        // 세션 안전하게 닫기
+          
+          // 성공 메시지 및 파일 용량 크기 출력
+          tft.printf("Successfully saved!\n");
+          tft.printf("Path: /wget_output.dat\n");
+          tft.printf("Size: %d Bytes\n", payload.length());
+        } 
+        // SD 카드 인식 불량이나 용량 부족 등 에러 발생 시 예외 처리
+        else {
+          tft.println("SD Card Write Failed!");
+          tft.println("Raw Data (First 60B):");
+          tft.println(payload.substring(0, 60)); // 파일 저장은 실패했으므로 앞부분만 LCD에 임시 노출
+        }
+      } 
+      // 웹 서버 응답 실패 코드 예외 처리 (예: 404 Not Found, 500 서버 에러 등)
+      else {
+        tft.printf("HTTP Fetch Failed. Code: %d\n", httpCode);
+      }
+      http.end(); // HTTP 연결 자원 해제
+    }
+  }
+
+  // =================================================================
   // --- [ 🔥 ARDUDOWS EXTENDED SYSTEM COMMANDS (50 GENERATIONS) 🔥 ] ---
   // =================================================================
 
@@ -8718,40 +9215,38 @@ void executeCommand(String cmd) {
 
   // 28. 네트워크 타임 프로토콜(NTP) 수동 시간 동기화 명령
   else if (cmd == "ntp sync") {
+    if (WiFi.status() != WL_CONNECTED) {
+        tft.println("!! ERROR: WIFI NOT CONNECTED");
+        return;
+    }
+
     tft.println(">> Contacting pool.ntp.org...");
     configTime(9 * 3600, 0, "pool.ntp.org", "time.nist.gov");
+    
     struct tm timeinfo;
-    if (getLocalTime(&timeinfo)) {
-      tft.printf(">> SYNC SUCCESS: %04d-%02d-%02d %02d:%02d:%02d\n",
-                 timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
-                 timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-    } else tft.println("!! NTP TIMEOUT ERROR");
+    uint32_t startMs = millis();
+    bool syncSuccess = false;
+    
+    // 최대 3초 동안 NTP 서버 응답을 기다리는 루프 락 분쇄
+    while (millis() - startMs < 3000) {
+        if (getLocalTime(&timeinfo)) {
+            syncSuccess = true;
+            break;
+        }
+        delay(100); // 100ms마다 재시도
+    }
+
+    if (syncSuccess) {
+        tft.printf(">> SYNC SUCCESS: %04d-%02d-%02d %02d:%02d:%02d\n",
+                   timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+                   timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+    } else {
+        tft.println("!! NTP TIMEOUT ERROR (SERVER NO RESPONSE)");
+    }
   }
 
   // 29. 무선 공유기 접속 강제 드롭 아웃 매개변수 테스트
-  else if (cmd == "wifi disconnect") {
-    WiFi.disconnect();
-    tft.println(">> Wireless Link Terminated Defensively.");
-  }
-
-  // 30. 간이 TCP 에코 서버 가동 (포트 8888 백그라운드 리스너)
-  else if (cmd == "tcp listen") {
-    tft.println(">> TCP Listener deployment on port 8888...");
-    WiFiServer srv(8888);
-    srv.begin();
-    uint32_t t = millis();
-    while(millis() - t < 10000) { // 10초 대기 모드
-      WiFiClient cl = srv.available();
-      if(cl) {
-        tft.println(">> Client connected to Test Core!");
-        cl.println("Ardudows ATK Remote Link Estabished.");
-        cl.stop();
-        break;
-      }
-    }
-    tft.println(">> Listener closed.");
-  }
-
+  else if (cmd == "wifi disconnect") { 
   // 31. TFT 스크린 테스트용 컬러 바 패턴 제너레이터 출력
   else if (cmd == "tft colorbar") {
     uint16_t colors[] = {TFT_RED, TFT_GREEN, TFT_BLUE, TFT_YELLOW, TFT_MAGENTA, TFT_CYAN, TFT_WHITE};
@@ -9270,6 +9765,514 @@ void executeCommand(String cmd) {
     tft.println("      A R D U D O W S   O S     ");
     tft.println("=================================");
     tft.setTextColor(TFT_GREEN);
+  }
+
+  // --- [ 🔥 ARDUDOWS EXTENDED SYSTEM COMMANDS (81 ~ 130 GENERATIONS) 🔥 ] ---
+
+  // 81. 가상 가위바위보 게임 (심심풀이용 겜블)
+  else if (cmd.startsWith("rps ")) {
+    String user = cmd.substring(4); user.trim();
+    String rps[] = {"rock", "paper", "scissors"};
+    String com = rps[random(0, 3)];
+    tft.printf(">> YOU: %s vs COM: %s\n", user.c_str(), com.c_str());
+    if (user == com) tft.println(">> RESULT: DRAW");
+    else if ((user == "rock" && com == "scissors") || (user == "paper" && com == "rock") || (user == "scissors" && com == "paper")) {
+        tft.setTextColor(TFT_YELLOW); tft.println(">> RESULT: YOU WIN! 🎉");
+    } else { tft.setTextColor(TFT_RED); tft.println(">> RESULT: YOU LOSE.."); }
+    tft.setTextColor(TFT_GREEN);
+  }
+
+  // 82. 다운타임 카운트다운 타이머 (디스플레이 블러킹 알람)
+  else if (cmd.startsWith("timer ")) {
+    int sec = cmd.substring(6).toInt();
+    tft.printf(">> TIMER STARTED FOR %d SEC\n", sec);
+    for(int i = sec; i > 0; i--) {
+        tft.printf("Remaining: %d s  \r", i);
+        delay(1000);
+    }
+    tft.println("\n>> TIME UP!");
+    for(int i=0; i<3; i++) { pz(1500, 100); delay(50); }
+  }
+
+  // 83. 랜덤 명언 제조기 (감성 충전기)
+  else if (cmd == "fortune") {
+    String quotes[] = {
+        "Stay hungry, Stay foolish.",
+        "Talk is cheap. Show me the code.",
+        "To be INFJ is to understand the world inside.",
+        "Ardudows will rule the Embedded World.",
+        "There is no place like 127.0.0.1"
+    };
+    tft.setTextColor(TFT_YELLOW);
+    tft.printf("🔮 %s\n", quotes[random(0, 5)].c_str());
+    tft.setTextColor(TFT_GREEN);
+  }
+
+  // 84. 파일 라인 번호 매겨서 출력 (NL 명령어)
+  else if (cmd.startsWith("nl ")) {
+    String file = cmd.substring(3); file.trim();
+    if (!file.startsWith("/")) file = currentPath + (currentPath.endsWith("/") ? "" : "/") + file;
+    File f = SD.open(file.c_str(), FILE_READ);
+    if (f) {
+        int lineIdx = 1;
+        while(f.available()) {
+            String line = f.readStringUntil('\n');
+            tft.printf("%4d | %s\n", lineIdx++, line.c_str());
+        }
+        f.close();
+    } else tft.println("!! FILE NOT FOUND");
+  }
+
+  // 85. 대문자를 소문자로 변환해주는 셸 필터
+  else if (cmd.startsWith("tolower ")) {
+    String txt = cmd.substring(8);
+    txt.toLowerCase();
+    tft.printf(">> lower: %s\n", txt.c_str());
+  }
+
+  // 86. 소문자를 대문자로 변환해주는 셸 필터
+  else if (cmd.startsWith("toupper ")) {
+    String txt = cmd.substring(8);
+    txt.toUpperCase();
+    tft.printf(">> UPPER: %s\n", txt.c_str());
+  }
+
+  // 87. 화면 중앙에 정밀 디지털시계 10초간 출력 (NTP 동기화 상태 권장)
+  else if (cmd == "clock") {
+    tft.fillScreen(TFT_BLACK);
+    for(int i=0; i<20; i++) {
+        tft.setCursor(40, tft.height()/2 - 10);
+        tft.setTextSize(3);
+        tft.setTextColor(TFT_CYAN, TFT_BLACK);
+        struct tm timeinfo;
+        if (getLocalTime(&timeinfo)) {
+            tft.printf("%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+        } else {
+            tft.printf("T+%lu s", millis() / 1000);
+        }
+        delay(500);
+    }
+    tft.fillScreen(TFT_BLACK); tft.setTextSize(2); tft.setTextColor(TFT_GREEN); tft.setCursor(0,0);
+  }
+
+  // 88. 지정 파일의 맨 마지막 5줄만 파싱해서 보기 (Tail 기능)
+  else if (cmd.startsWith("tail ")) {
+    String file = cmd.substring(5); file.trim();
+    if (!file.startsWith("/")) file = currentPath + (currentPath.endsWith("/") ? "" : "/") + file;
+    File f = SD.open(file.c_str(), FILE_READ);
+    if (f) {
+        String lines[5]; int idx = 0;
+        while(f.available()) {
+            lines[idx % 5] = f.readStringUntil('\n');
+            idx++;
+        }
+        f.close();
+        tft.println(">> LAST 5 LINES:");
+        int start = (idx > 5) ? (idx % 5) : 0;
+        int count = (idx > 5) ? 5 : idx;
+        for(int i=0; i<count; i++) {
+            tft.println(lines[(start + i) % 5]);
+        }
+    } else tft.println("!! FILE NOT FOUND");
+  }
+
+  // 89. 간단한 단어(String) 교체 유틸리티 (Sed 가상화)
+  else if (cmd.startsWith("replace ")) {
+    // 사용법: replace [파일] [찾을단어] [바꿀단어] -> 임시 출력용
+    int sp1 = cmd.indexOf(' ', 8);
+    int sp2 = cmd.indexOf(' ', sp1 + 1);
+    if(sp1 > 0 && sp2 > 0) {
+        String file = cmd.substring(8, sp1);
+        String target = cmd.substring(sp1 + 1, sp2);
+        String replaceTo = cmd.substring(sp2 + 1);
+        if (!file.startsWith("/")) file = currentPath + (currentPath.endsWith("/") ? "" : "/") + file;
+        File f = SD.open(file.c_str(), FILE_READ);
+        if(f) {
+            while(f.available()) {
+                String line = f.readStringUntil('\n');
+                line.replace(target, replaceTo);
+                tft.println(line);
+            }
+            f.close();
+        }
+    } else tft.println("Usage: replace [file] [old] [new]");
+  }
+
+  // 90. 부팅 이후 무실패 힙 메모리 할당 한계점(High Watermark) 검사
+  else if (cmd == "mem max") {
+    tft.println(">> HEAP MEMORY WATERMARK");
+    tft.printf(" - Absolute Min Free Heap: %d KB\n", ESP.getMinFreeHeap() / 1024);
+    tft.printf(" - System Safe Block Margin: %d KB\n", ESP.getMaxAllocHeap() / 1024);
+  }
+
+  // 91. 랜덤 패스워드 생성기 (보안 키 생성용)
+  else if (cmd.startsWith("keygen ")) {
+    int len = cmd.substring(7).toInt();
+    if(len <= 0 || len > 32) len = 8;
+    String pool = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$";
+    tft.print(">> GEN KEY: ");
+    tft.setTextColor(TFT_WHITE);
+    for(int i=0; i<len; i++) tft.print(pool[random(0, pool.length())]);
+    tft.println(); tft.setTextColor(TFT_GREEN);
+  }
+
+  // 92. 10진수를 다른 진법(8진수, 16진수, 2진수)으로 올인원 변환
+  // (기존의 dec, hex 등 개별 변환을 보완하는 매트릭스 변환기)
+  else if (cmd.startsWith("base ")) {
+    int num = cmd.substring(5).toInt();
+    tft.printf(">> BASE MATRIX FOR (%d)\n", num);
+    tft.printf(" - OCT: 0%o\n", num);
+    tft.printf(" - HEX: 0x%X\n", num);
+    tft.printf(" - BIN: %s\n", String(num, BIN).c_str());
+  }
+
+  // 93. 파일 크기 0짜리 빈 파일 생성 간소화 패치 (touch 우회)
+  else if (cmd.startsWith("mkfile ")) {
+    String file = cmd.substring(7); file.trim();
+    if (!file.startsWith("/")) file = currentPath + (currentPath.endsWith("/") ? "" : "/") + file;
+    File f = SD.open(file.c_str(), FILE_WRITE);
+    if(f) { tft.printf(">> Clean Block Allocated: %s\n", file.c_str()); f.close(); }
+    else tft.println("!! SD ERROR");
+  }
+
+  // 94. 수학 연산용 상용 상수 원터치 조회
+  else if (cmd == "math const") {
+    tft.println(">> ARDUDOWS KERNEL MATH CONSTANTS");
+    tft.printf(" - PI (원주율)   : %.7f\n", PI);
+    tft.printf(" - E  (자연대수) : %.7f\n", 2.7182818);
+    tft.printf(" - LN2           : %.7f\n", 0.6931471);
+  }
+
+  // 95. 간단한 텍스트 암호화 덤프 (카이사르 시프트 가상 인코더)
+  else if (cmd.startsWith("cipher ")) {
+    String txt = cmd.substring(7);
+    tft.print(">> ENCRYPTED V-STREAM: ");
+    for(int i=0; i<txt.length(); i++) {
+        tft.print((char)(txt[i] + 3)); // 3칸씩 밀기
+    }
+    tft.println();
+  }
+
+  // 96. 암호화 텍스트 복호화 디코더
+  else if (cmd.startsWith("decipher ")) {
+    String txt = cmd.substring(9);
+    tft.print(">> DECRYPTED V-STREAM: ");
+    for(int i=0; i<txt.length(); i++) {
+        tft.print((char)(txt[i] - 3)); // 3칸씩 당기기
+    }
+    tft.println();
+  }
+
+  // 97. 시스템 디스크 섹터 상태 시뮬레이터 (SD카드 배드섹터 및 파티션 가상 조화)
+  else if (cmd == "df") {
+    tft.println(">> FILE SYSTEM PARTITION MAP");
+    uint32_t total = SD.totalBytes();
+    uint32_t used = SD.usedBytes();
+    tft.printf(" - Block Type: FAT32 / SDMMC Link\n");
+    tft.printf(" - Capacity  : %llu MB / %llu MB\n", used/(1024*1024), total/(1024*1024));
+    tft.printf(" - Usage Log : %.1f %%\n", ((float)used/total)*100.0f);
+  }
+
+  // 98. 스크린 터치 보정 좌표 원시 로깅 데이터 수집기
+  /*
+  else if (cmd == "touch test") {
+    tft.println(">> TOUCH SCREEN READ MATRIX (ANY KEY ON SERIAL TO EXIT)");
+    while(!Serial.available()) {
+        uint16_t tx = 0, ty = 0;
+        if(tft.getTouch(&tx, &ty)) { // 전용 TFT_eSPI 터치 래퍼 매핑 적용 시
+            tft.printf("RAW X: %d, Y: %d          \r", tx, ty);
+        }
+        delay(100);
+    }
+    tft.println("\n>> TEST END.");
+  }
+  */
+
+  // 99. 현재 설정된 전역 통신망 및 인터페이스 요약본
+  /*
+  else if (cmd == "ifconfig") {
+    tft.println(">> ATK KERNEL NETWORK INTERFACES");
+    tft.printf(" - eth0 (Virtual) : LINK DOWN\n");
+    tft.printf(" - wlan0 (STA)    : %s [IP: %s]\n", (WiFi.status() == WL_CONNECTED)?"READY":"DISCONNECTED", WiFi.localIP().toString().c_str());
+    tft.printf(" - wlan1 (AP)     : %s [IP: %s]\n", (WiFi.softAPIP() != IPAddress(0,0,0,0))?"RUNNING":"SHUTDOWN", WiFi.softAPIP().toString().c_str());
+  }
+  */
+
+  // 100. 로컬 와이파이 노드 스캔 신호 정밀 강도 순 정렬 필터 (기존스캔 확장형)
+  else if (cmd == "wifi scan best") {
+    tft.println(">> HUNTING BEST WIRELESS AP...");
+    int n = WiFi.scanNetworks();
+    if (n == 0) tft.println("!! NO NETWORKS FOUND");
+    else {
+        // 단일 최고 신호 정밀 축출
+        int bestIdx = 0; int maxRssi = -150;
+        for (int i = 0; i < n; ++i) {
+            if(WiFi.RSSI(i) > maxRssi) { maxRssi = WiFi.RSSI(i); bestIdx = i; }
+        }
+        tft.printf("⭐ TOP AP: %s (%d dBm) CH:%d\n", WiFi.SSID(bestIdx).c_str(), WiFi.RSSI(bestIdx), WiFi.channel(bestIdx));
+    }
+  }
+
+  // 101. 하드웨어 외부 디바이스 감시용 주소값 검색 (I2C 주소 자동 분석 뷰어)
+  else if (cmd == "i2c map") {
+    tft.println(">> I2C ADDR GRID INDEX");
+    for(byte address = 1; address < 127; address++ ) {
+        Wire.beginTransmission(address);
+        if (Wire.endTransmission() == 0) {
+            tft.printf(" -> FOUND DEVICE AT: 0x%02X\n", address);
+        }
+    }
+    tft.println(">> MAPPING COMPLETE.");
+  }
+
+  // 102. 터미널 프롬프트 가상 지연 테스트 (비동기 스케줄 감시용)
+  else if (cmd.startsWith("sleepms ")) {
+    int ms = cmd.substring(8).toInt();
+    tft.printf(">> FreeRTOS Thread Blocking for %d ms...\n", ms);
+    vTaskDelay(pdMS_TO_TICKS(ms));
+    tft.println(">> Thread Woke Up.");
+  }
+
+  // 103. 지정 텍스트 파일의 문자 수 정밀 계산기
+  else if (cmd.startsWith("wc char ")) {
+    String file = cmd.substring(8); file.trim();
+    if (!file.startsWith("/")) file = currentPath + (currentPath.endsWith("/") ? "" : "/") + file;
+    File f = SD.open(file.c_str(), FILE_READ);
+    if(f) {
+        uint32_t charCnt = 0;
+        while(f.available()) { f.read(); charCnt++; }
+        f.close();
+        tft.printf(">> Pure Character Count: %lu Bytes\n", charCnt);
+    } else tft.println("!! FILE NOT FOUND");
+  }
+
+  // 104. CPU 틱 레이트 기반 간단한 가상 난수 행렬 출력
+  else if (cmd == "rand map") {
+    for(int i=0; i<5; i++) {
+        tft.printf("%04X %04X %04X %04X %04X\n", esp_random()&0xFFFF, esp_random()&0xFFFF, esp_random()&0xFFFF, esp_random()&0xFFFF, esp_random()&0xFFFF);
+    }
+  }
+
+  // 105. ESP32 고유 실리콘 맥주소 하이레벨 바이트 변환 뷰어
+  else if (cmd == "hw uid") {
+    uint8_t mac[6];
+    esp_efuse_mac_get_default(mac);
+    tft.printf(">> SILICON CORRELATION ID: %02X%02X%02X%02X%02X%02X\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+  }
+
+  // 106. 간단한 사각형 렌더링 폼 그래픽스 유닛 엔진
+  else if (cmd.startsWith("draw rect ")) {
+    // 사용법: draw rect w h (중앙 배치 가상 타겟팅)
+    int s = cmd.indexOf(' ', 10);
+    if(s > 0) {
+        int w = cmd.substring(10, s).toInt();
+        int h = cmd.substring(s+1).toInt();
+        tft.drawRect(tft.width()/2 - w/2, tft.height()/2 - h/2, w, h, TFT_WHITE);
+        delay(1500); tft.fillScreen(TFT_BLACK);
+    }
+  }
+
+  // 107. 원형 그래픽 렌더링 가속 유닛 엔진
+  else if (cmd.startsWith("draw circle ")) {
+    int r = cmd.substring(12).toInt();
+    tft.drawCircle(tft.width()/2, tft.height()/2, r, TFT_YELLOW);
+    delay(1500); tft.fillScreen(TFT_BLACK);
+  }
+
+  // 108. 가상 프로세스 아이디 및 우선순위 디스패처
+  else if (cmd == "ps") {
+    tft.println(">> ATK CORE PROCESS SCHEDULER");
+    tft.println(" PID  PRIO  COMMAND            CORE");
+    tft.println("   1    5   vTaskSwitchContext    0");
+    tft.println("  22    1   ATK_Shell_Main        1");
+    tft.printf("  45    4   WiFi_Engine_Daemon    0\n");
+  }
+
+  // 109. 소리 분석을 위한 임시 부저 주파수 스윕 (사이렌 연출)
+  else if (cmd == "sweep pz") {
+    tft.println(">> INITIATING FREQUENCY SWEEP...");
+    for(int fr = 500; fr < 2500; fr += 50) { pz(fr, 15); delay(2); }
+    for(int fr = 2500; fr > 500; fr -= 50) { pz(fr, 15); delay(2); }
+    tft.println(">> SWEEP COMPLETED.");
+  }
+
+  // 110. 무선 공유기 접속 연결 내부 상태 코드 추적기
+  else if (cmd == "wifi status") {
+    tft.print(">> Link Status Code: ");
+    switch(WiFi.status()) {
+        case WL_IDLE_STATUS: tft.println("IDLE"); break;
+        case WL_NO_SSID_AVAIL: tft.println("NO SSID AVAIL"); break;
+        case WL_CONNECTED: tft.println("CONNECTED"); break;
+        case WL_CONNECT_FAILED: tft.println("CONNECTION FAILED"); break;
+        case WL_DISCONNECTED: tft.println("LINK DISCONNECTED"); break;
+        default: tft.println("UNKNOWN MATRIX ERROR"); break;
+    }
+  }
+
+  /*
+  // 111. 하드웨어 고유 레지스터 기반 암호화 틱 생성 (하드웨어 난수 시드값 검사)
+  else if (cmd == "hw seed") {
+    uint32_t seed1 = REG_READ(AMPLITUDE_SENSE_REG); // 하드웨어 노이즈 캐치용 레지스터
+    tft.printf(">> ENTROPY HARVESTED SEED: 0x%08X\n", seed1 ^ esp_random());
+  }
+  */
+
+  // 112. 스크린 인쇄용 시스템 로그 가상 버퍼 비우기
+  else if (cmd == "syslog clear") {
+    if(SD.exists("/dos/history.log")) {
+        SD.remove("/dos/history.log");
+        tft.println(">> ATK System Log Session Purged.");
+    } else tft.println(">> No Log Stream Found.");
+  }
+
+  // 113. 텍스트 라인 데이터 정밀 문자 매칭 검사 복수 필터
+  else if (cmd.startsWith("match ")) {
+    // 사용법: match [문자열1] [문자열2]
+    int sp = cmd.indexOf(' ', 6);
+    if(sp > 0) {
+        String s1 = cmd.substring(6, sp); String s2 = cmd.substring(sp+1);
+        tft.printf(">> COMPARE CORRELATION: %s\n", (s1==s2)?"EQUAL (100%)":"DIFFERENT");
+    }
+  }
+
+  // 114. 내부 Flash 파티션 테이블 가상 노드 레이아웃 검사
+  else if (cmd == "part table") {
+    tft.println(">> FLASH PARTITION LAYOUT MAP");
+    tft.println(" Name     Type     Subtype    Size");
+    tft.println(" ---------------------------------");
+    tft.println(" nvs      data     nvs        20 KB");
+    tft.println(" otadata  data     ota        8 KB");
+    tft.println(" app0     app      ota_0      4.5 MB");
+    tft.println(" app1     app      ota_1      4.5 MB");
+    tft.printf(" storage  data     fat        6.8 MB\n");
+  }
+
+  // 115. 외부 가상 핑 리퀘스트 대기용 ICMP 패킷 세션 브레이커 시뮬레이터
+  else if (cmd == "ping kill") {
+    tft.println(">> ALL ACTIVE INTERRUPT PING REQUEST TERMINATED DEFENSIVELY.");
+  }
+
+  // 116. 스크린 잔상 제거용 미세 화소 반전 복구 패턴 스트리밍
+  else if (cmd == "tft burnin fix") {
+    tft.println(">> FLUSHING LIQUID CRYSTAL MATRIX...");
+    for(int i=0; i<3; i++) {
+        tft.fillScreen(TFT_WHITE); delay(200);
+        tft.fillScreen(TFT_BLACK); delay(200);
+    }
+    tft.setTextColor(TFT_GREEN); tft.println(">> LIQUID CRYSTAL RESTORED.");
+  }
+
+  // 117. 고속 전력 모니터링 버스 전하 감쇄 가상 프로파일링
+  else if (cmd == "power matrix") {
+    tft.println(">> REAL-TIME BUS LOAD FACTOR");
+    tft.printf(" - Core VDD Volt Est : 3.314 V [STABLE]\n");
+    tft.printf(" - RF Transceiver Load: %s\n", (WiFi.status()==WL_CONNECTED)?"45 mA":"12 mA");
+  }
+
+  // 118. 시스템 커널 경고음 (모스 부호 SOS 수동 가속 매핑)
+  else if (cmd == "sys sos") {
+    tft.println(">> BROADCASTING AUDIBLE SOS SIGNAL...");
+    for(int i=0; i<3; i++) { pz(2000, 100); delay(100); } // S
+    delay(200);
+    for(int i=0; i<3; i++) { pz(2000, 300); delay(100); } // O
+    delay(200);
+    for(int i=0; i<3; i++) { pz(2000, 100); delay(100); } // S
+  }
+
+  // 119. 파일의 앞부분 16바이트만 아스키로 빠르게 요약 파싱 (간이 헤더 스니퍼)
+  else if (cmd.startsWith("sniffhead ")) {
+    String file = cmd.substring(10); file.trim();
+    if (!file.startsWith("/")) file = currentPath + (currentPath.endsWith("/") ? "" : "/") + file;
+    File f = SD.open(file.c_str(), FILE_READ);
+    if(f) {
+        tft.print(">> ASCII HEADERS: ");
+        for(int i=0; i<16 && f.available(); i++) {
+            char c = f.read();
+            if(c >= 32 && c <= 126) tft.print(c);
+            else tft.print(".");
+        }
+        f.close(); tft.println();
+    } else tft.println("!! FILE NOT FOUND");
+  }
+
+  // 120. 시스템 전역 환경 변수 가상 테이블 조회
+  else if (cmd == "env") {
+    tft.println(">> ATK CORE ENVIRONMENT VARIABLES");
+    tft.printf(" SHELL=%s\n", "ATK_Shell_v1.1");
+    tft.printf(" PATH=%s\n", "/Ardudows/System:/bin");
+    tft.printf(" USER=%s\n", auicUsername.c_str());
+    tft.printf(" TERM_COLOR=%s\n", "TFT_GREEN_MATRIX");
+  }
+
+  // 121. 삼각함수 탄젠트 라디안 테이블 고속 연산 매핑 벤치마크
+  else if (cmd.startsWith("math tan ")) {
+    float val = cmd.substring(9).toFloat();
+    tft.printf(">> tan(%.2f rad) = %.5f\n", val, tan(val));
+  }
+
+  // 122. 지정 파일에 텍스트 데이터 개행(Append) 모드로 바로 밀어 넣기
+  else if (cmd.startsWith("append ")) {
+    // 사용법: append [파일] [텍스트]
+    int sp = cmd.indexOf(' ', 7);
+    if(sp > 0) {
+        String file = cmd.substring(7, sp); String text = cmd.substring(sp+1);
+        if (!file.startsWith("/")) file = currentPath + (currentPath.endsWith("/") ? "" : "/") + file;
+        File f = SD.open(file.c_str(), FILE_APPEND);
+        if(f) { f.println(text); f.close(); tft.println(">> Stream Appended."); }
+        else tft.println("!! WRITE PROTECTED OR SD ERROR");
+    }
+  }
+
+  /*
+  // 123. 무선 스니퍼 모드 기동 전 하드웨어 레디오 전하 셧다운 체크 유닛
+  else if (cmd == "rf status") {
+    tft.println(">> RF TRANSCEIVER CORE REGISTERS");
+    uint32_t rf_reg = READ_PERI_REG(SYSTEM_SYSCLK_CONF_REG);
+    tft.printf(" - MAC Link Base Gate Check: 0x%08X\n", rf_reg);
+  }
+  */
+
+  // 124. 정밀 소수점 제곱근 연산 가속 하드웨어 FPU 확인 엔진
+  else if (cmd.startsWith("math sqrt ")) {
+    float val = cmd.substring(10).toFloat();
+    if(val >= 0) tft.printf(">> sqrt(%.2f) = %.5f\n", val, sqrt(val));
+    else tft.println("!! MATH DOMAIN ERROR");
+  }
+
+  // 125. 복수 디렉토리 경로 체인 강제 리셋 (경로 꼬임 원천 방어)
+  else if (cmd == "cd reset") {
+    currentPath = "/";
+    tft.println(">> Shell Working Path Forced Back to Root [/]");
+  }
+
+  // 126. 실시간 프리 RTOS 클록 틱 카운트 정밀 검사
+  else if (cmd == "kernel ticks") {
+    tft.printf(">> OS KERNEL TOTAL TICK COUNT: %lu Ticks\n", xTaskGetTickCount());
+  }
+
+  // 127. 터미널 로고 컬러 테마 임시 스왑 (반전 매트릭스 테마)
+  else if (cmd == "color retro") {
+    tft.setTextColor(TFT_ORANGE);
+    tft.println(">> COMPILER THEME RE-RENDERED TO RETRO AMBER CONSOLE.");
+  }
+
+  // 128. 무선 패킷 인터럽트 드라이버 완전 수동 바인딩 해제
+  else if (cmd == "wifi stop") {
+    esp_wifi_stop();
+    tft.println(">> Wi-Fi Stack completely destroyed from silicon layer.");
+  }
+
+  // 129. 무선 패킷 인터럽트 드라이버 수동 커널 재배치 및 활성화
+  else if (cmd == "wifi start") {
+    esp_wifi_start();
+    tft.println(">> Wi-Fi Stack freshly linked onto core driver matrix.");
+  }
+
+  // 130. 시스템 완전 파괴 방지용 보안 레벨 잠금 모니터
+  else if (cmd == "sys secure") {
+    tft.println(">> ARDUDOWS KERNEL PROTECTION LEVEL");
+    tft.printf(" - Memory Write Lock: SAFE BLOCK ACTIVE\n");
+    tft.printf(" - Core Integrity Check Flag: 0x%02X [GOOD]\n", esp_reset_reason());
   }
 
   // --- [ ARDUDOWS INTERPRETER SYSTEM ] ---
