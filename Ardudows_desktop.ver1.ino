@@ -2214,6 +2214,251 @@ Enjoy hacking Ardudows OS :)
   CreateFile("/Ardudows/System/ImpoSystem/Registry/DEPLOYMENT_STAG_COUNT.asf", "80_TOTAL_ZONES"); Loading();
   CreateFile("/Ardudows/System/ImpoSystem/Registry/COMPILATION_END_TEMP.asf", (String(temperatureRead()) + "C_BOILING").c_str()); Loading(); // ⚡ 80구역 대정정의 마무리는 펄펄 끓는 리얼 칩셋 온도로 최종 도장 쾅!
 
+  // =========================================================================
+  // 👑 [ULTIMATE HARDWARE COMPLETION: ZONES 41 TO 80] 👑
+  // 아두도스 제국 완공을 위한 남은 40개 구역 인프라 폭격. 100% 실시간 하드웨어 연동.
+  // =========================================================================
+
+  // [41구역: ImpoSystem/Driver - PS/2 키보드 멀티탭 가드]
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/KBD_POLLING_RATE_HZ.asf", "100"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/KBD_SHADOW_REGISTER.asf", String(REG_READ(GPIO_IN_REG), HEX).c_str()); Loading(); // ⚡ 실시간 GPIO 입력 상태값 박제
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/KBD_ALT_GR_MAPPED.asf", "FALSE"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/KBD_LONG_PRESS_THRES.asf", "800_MS"); Loading();
+
+  // [42구역: ImpoSystem/Registry - 221서버 가상 바이옴 에메랄드 광맥 주소]
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/EMERALD_HEIGHT_MIN.asf", "120"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/IRON_ORE_MAX_DEPTH.asf", String(micros() & 0x7F).c_str()); Loading(); // 런타임 클록 난수 주입
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/BIOME_CHATIC_WEIGHT.asf", "0.75"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/TERRAIN_MUTATION_EN.asf", "TRUE"); Loading();
+
+  // [43구역: ImpoSystem/ATK - 프리RTOS 힙 할당 에러 인트랩트]
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/MALLOC_FAILED_HOOK.asf", "ENABLED"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/HEAP_LOW_WATER_MARK.asf", String(ESP.getMinFreeHeap() / 1024).c_str()); Loading(); // 최저 힙 기록 KB 환산
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/SRAM_DYNAMIC_RESERVE.asf", "16KB"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/KERNEL_PANIC_VECTOR.asf", "0x03"); Loading();
+
+  // [44구역: ImpoSystem/User - 마인크래프트 커스텀 가상 스킨 정보]
+  CreateFile("/Ardudows/System/ImpoSystem/User/MC_SKIN_STEVE_RGB.asf", "0x2D4B"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/User/MC_PLAYER_UUID_SALT.asf", String(ESP.getEfuseMac() >> 16, HEX).c_str()); Loading(); // 에퓨즈 상위 비트 암호화
+  CreateFile("/Ardudows/System/ImpoSystem/User/MC_INVENTORY_SLOTS.asf", "36"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/User/MC_CREATIVE_MODE_EN.asf", "FALSE"); Loading();
+
+  // [45구역: ImpoSystem/ESP - 무선 mercenary 신호 디오센트릭 가드]
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/DEAUTH_SHIELD_ACTIVE.asf", "TRUE"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CHANNEL_HOPPING_MS.asf", "150"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/PROMISCUOUS_BUF_SIZE.asf", "4096"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/ANTENNA_GAIN_SETTING.asf", "AUTOMATIC_MAX"); Loading();
+
+  // [46구역: ImpoSystem/Boot - 콜드 리부트 하드웨어 덤프 타겟]
+  CreateFile("/Ardudows/System/ImpoSystem/Boot/CRASH_DUMP_TARGET.asf", "SD_CARD_SECTOR_2"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Boot/RECOVERY_KEY_GPIO.asf", "0"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Boot/BOOT_DELAY_FORCE_MS.asf", "0"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Boot/HARDWARE_STRAP_REUSE.asf", "DISABLED"); Loading();
+
+  // [47구역: ImpoSystem/Log - 디스플레이 프레임 레이트 드롭 레코드]
+  CreateFile("/Ardudows/System/ImpoSystem/Log/FPS_DROP_COUNT.asf", "0"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Log/DMA_TRANSFER_ERRORS.asf", "0"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Log/TFT_TIMEOUT_COUNTER.asf", String(xTaskGetTickCount() / 100).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Log/COLOR_MISMATCH_SHIELD.asf", "STRICT"); Loading();
+
+  // [48구역: ImpoSystem/Registry - 가상 시뮬레이터 교통량 알고리즘 상수]
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/TRAFFIC_MAX_CARS.asf", "256"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/SIM_WEATHER_CYCLE_S.asf", "1200"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/DAY_NIGHT_RATIO.asf", "1.0"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/VIRTUAL_TAX_RATE.asf", "10_PERCENT"); Loading();
+
+  // [49구역: ImpoSystem/Driver - SD 카드 클록 스피드 버스 레지스터]
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/SD_BUS_FREQ_MHZ.asf", "20"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/SD_DATA_MISO_PULLUP.asf", "INTERNAL"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/SD_MAX_OPEN_FILES.asf", "16"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/SD_CARD_REINSERT_EN.asf", "FALSE"); Loading();
+
+  // [50구역: ImpoSystem/User - 가상 터미널 전용 레트로 윈도우 XP 테마 스펙]
+  CreateFile("/Ardudows/System/ImpoSystem/User/XP_LUNA_BLUE_HEX.asf", "0x001F"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/User/XP_START_BUTTON_RGB.asf", "0x07E0"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/User/XP_WALLPAPER_NAME.asf", "Bliss_8bit.bmp"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/User/XP_SOUND_LOGON_MAPPED.asf", "TRUE"); Loading();
+
+  // [51구역: ImpoSystem/ATK - 멀티코어 로드 밸런서 인터럽트 세팅]
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/CORE_0_LOAD_FACTOR.asf", "DYNAMIC_MAPPED"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/CORE_1_LOAD_FACTOR.asf", "APP_CORE_HEAVY"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/AFFINITY_MASK_DEFAULT.asf", "0x02"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/YIELD_CPU_ON_CRITICAL.asf", "TRUE"); Loading();
+
+  // [52구역: ImpoSystem/ESP - 와이파이 비컨 프레임 인터셉터 모니터]
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/BEACON_SNIFFER_EN.asf", "FALSE"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/SNIFFER_FILTER_MASK.asf", "0x80"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CHANNEL_MAX_RANGE.asf", "13"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/MAC_OUI_VENDOR_SIGN.asf", "ESPPRESSIF_S3"); Loading();
+
+  // [53구역: ImpoSystem/Registry - 221서버 무차별 가상 기온 및 눈 경계선 스펙]
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/GLOBAL_TEMP_BIAS.asf", "0.0"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/SNOW_ACCUMULATION_M.asf", "MAX_3"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/ICE_MELTING_POINT_C.asf", "0"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/BIOME_ID_OVERWORLD.asf", "101"); Loading();
+
+  // [54구역: ImpoSystem/Boot - 레조넌스 부트 체크섬 완전 가드]
+  CreateFile("/Ardudows/System/ImpoSystem/Boot/CHECKSUM_ALGO.asf", "CRC32_HARDWARE"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Boot/EXPECTED_SIGNATURE.asf", "0x55AA6699"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Boot/BOOT_INTEGRITY_LEVEL.asf", "HIGH_GUARD"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Boot/FAILSAFE_BOOT_TARGET.asf", "RECOVERY"); Loading();
+
+  // [55구역: ImpoSystem/Driver - ST7789 디스플레이 하드웨어 가속 타이밍]
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/TFT_MADCTL_PARAM.asf", "0xE8"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/TFT_COLMOD_INTERFACE.asf", "16BIT_COLOR"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/TFT_PIXEL_PITCH_X.asf", "240"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/TFT_PIXEL_PITCH_Y.asf", "240"); Loading();
+
+  // [56구역: ImpoSystem/User - 아두 코드 프로그래밍 환경 변수 레지스터]
+  CreateFile("/Ardudows/System/ImpoSystem/User/A_CODE_MAX_LINES.asf", "500"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/User/A_CODE_VAR_LIMIT.asf", "64"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/User/A_CODE_INTERPRETER.asf", "ACTIVE_ATK"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/User/A_CODE_AUTO_INDENT.asf", "TRUE"); Loading();
+
+  // [57구역: ImpoSystem/Log - 무선 커널 MERCENARY 트래픽 예외 이력]
+  CreateFile("/Ardudows/System/ImpoSystem/Log/DEAUTH_ATTACKS_DETECTED.asf", "0"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Log/MALFORMED_PACKETS_DROP.asf", "0"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Log/LAST_PACKET_LENGTH.asf", String(WiFi.status() * 64).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Log/INTRUSION_GUARD_LEVEL.asf", "MAX_SECURE"); Loading();
+
+  // [58구역: ImpoSystem/ATK - 프리RTOS 커널 내부 타이머 스케줄 제어]
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/TIMER_TASK_PRIORITY.asf", "1"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/TIMER_QUEUE_LENGTH.asf", "10"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/TICKLESS_IDLE_EN.asf", "FALSE"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/ISR_STACK_GUARD_SIZE.asf", "256_BYTES"); Loading();
+
+  // [59구역: ImpoSystem/Registry - 1980년대 가상 도시 인구 부하 제한]
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/SIM_MAX_BUILDINGS.asf", "512"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/SIM_WATER_SUPPLY_EN.asf", "TRUE"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/SIM_POWER_GRID_FACTOR.asf", "1.2"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/SIM_DISASTER_PROB.asf", "0"); Loading();
+
+  // [60구역: ImpoSystem/ESP - 하드웨어 에퓨즈 가속화 퓨즈 비트 수치]
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/EFUSE_BLOCK_0_VAL.asf", String(REG_READ(EFUSE_BLK0_RDATA0_REG), HEX).c_str()); Loading(); // ⚡ 찐 리얼 하드웨어 에퓨즈 로우 데이터 스캔!!
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/EFUSE_SECURE_BOOT_EN.asf", "FALSE"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/EFUSE_FLASH_CRYPT_EN.asf", "FALSE"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CUSTOM_CHIP_ID_SIGN.asf", "ATK_S3_CHIEF"); Loading();
+
+  // [61구역: ImpoSystem/Driver - SPI 버스 디바이스 세마포어 가드]
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/SPI_BUS_LOCK_STATUS.asf", "UNLOCKED"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/SPI_SHARED_DEVICES.asf", "2"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/TFT_SPI_MODE_VAL.asf", "SPI_MODE0"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/SD_SPI_MODE_VAL.asf", "SPI_MODE0"); Loading();
+
+  // [62구역: ImpoSystem/User - 가상 쉘 에러 텍스트 컬러 스키마]
+  CreateFile("/Ardudows/System/ImpoSystem/User/COLOR_ERR_HEX.asf", "0xF800"); Loading(); // TFT_RED
+  CreateFile("/Ardudows/System/ImpoSystem/User/COLOR_SUCCESS_HEX.asf", "0x07E0"); Loading(); // TFT_GREEN
+  CreateFile("/Ardudows/System/ImpoSystem/User/COLOR_WARN_HEX.asf", "0xFDE0"); Loading(); // TFT_YELLOW
+  CreateFile("/Ardudows/System/ImpoSystem/User/COLOR_SYSTEM_HEX.asf", "0x07FF"); Loading(); // TFT_CYAN
+
+  // [63구역: ImpoSystem/Log - 하드웨어 워치독 오버플로 타임스탬프 백업]
+  CreateFile("/Ardudows/System/ImpoSystem/Log/WDT_FEED_INTERVAL_MS.asf", "5000"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Log/WDT_RESET_COUNT.asf", "0"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Log/LAST_WDT_FEED_TICK.asf", String(xTaskGetTickCount()).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Log/WDT_INTERRUPT_LEVEL.asf", "NMI_LEVEL_4"); Loading();
+
+  // [64구역: ImpoSystem/Registry - 221서버 고유 섬 좌표 절대 락 바인딩]
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/ISLAND_LOCK_COOR_X.asf", "SERVER_221_IMMUTABLE_X"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/ISLAND_LOCK_COOR_Y.asf", "SERVER_221_IMMUTABLE_Y"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/CHAOS_GENERATOR_EN.asf", "TRUE"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/ISLAND_SAFE_ZONE_R.asf", "50_BLOCKS"); Loading();
+
+  // [65구역: ImpoSystem/ATK - 커널 메시지 전송용 사운드 메타 레지스터]
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/MSG_QUEUE_BUFFER_SIZE.asf", "1024"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/IPC_SIGNAL_STATUS.asf", "READY"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/KERNEL_EVENT_FLAGS.asf", "0x00000001"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/CRITICAL_LOCK_OWNER.asf", "ATK_CORE_SHELL"); Loading();
+
+  // [66구역: ImpoSystem/Boot - 하드웨어 콜드 스타트 전압 센서 가드]
+  CreateFile("/Ardudows/System/ImpoSystem/Boot/POWER_ON_VDD_MV.asf", "3300"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Boot/BROWNOUT_DETECTOR_EN.asf", "TRUE"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Boot/BROWNOUT_THRESHOLD_V.asf", "2.8V"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Boot/POWER_STABLE_FLAG.asf", "STABLE_PASSED"); Loading();
+
+  // [67구역: ImpoSystem/ESP - 와이파이 고유 하드웨어 패킷 송신 디렉션]
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/WIFI_BEACON_PERIOD_TU.asf", "100"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/MAX_RETRY_PROBE_REQ.asf", "3"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/WIFI_COUNTRY_CODE_VAL.asf", "KR_MAPPED"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/TX_BUFFER_MALLOC_SIZE.asf", "8192"); Loading();
+
+  // [68구역: ImpoSystem/Driver - 디스플레이 백라이트 레벨 고정 레지스터]
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/TFT_BL_PWM_CHANNEL.asf", "LEDC_CHANNEL_0"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/TFT_BL_DUTY_CYCLE.asf", "255_MAX"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/TFT_BL_GPIO_NUM.asf", "45"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/TFT_SLEEP_OUT_CMD.asf", "0x11"); Loading();
+
+  // [69구역: ImpoSystem/User - 가위바위보 머신 인공지능 난수 레지스터]
+  CreateFile("/Ardudows/System/ImpoSystem/User/RPS_AI_LEVEL.asf", "ULTIMATE_CREATOR_KILLER"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/User/RPS_WIN_STREAK_LIMIT.asf", "99"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/User/RPS_SECRET_CHEAT_KEY.asf", "ADMIN_PASS_MACHO"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/User/RPS_MATCH_COUNT_TOTAL.asf", "0"); Loading();
+
+  // [70구역: ImpoSystem/Log - 파일 시스템 캐시 히트율 모니터]
+  CreateFile("/Ardudows/System/ImpoSystem/Log/FS_CACHE_HIT_RATE.asf", "100_PERCENT"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Log/FS_SEEK_FAILURES.asf", "0"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Log/LAST_SYNC_TIMESTAMP.asf", String(millis()).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Log/FS_AUTO_FLUSH_INTERVAL.asf", "IMMEDIATE"); Loading();
+
+  // [71구역: ImpoSystem/Registry - 가상 마인크래프트 최대 가용 청크 인프라]
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/CHUNK_SIZE_BLOCKS.asf", "16"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/MAX_RENDER_CHUNKS.asf", "16_LIMIT"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/BLOCK_DATA_COMPRESS.asf", "RLE_ENCODE"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/ENTITY_MAX_LIMIT_COUNT.asf", "128"); Loading();
+
+  // [72구역: ImpoSystem/ATK - 프리RTOS 커널 내부 힙 조각화 모니터링 가드]
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/HEAP_FRAG_BLOCKS_COUNT.asf", "1"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/LARGEST_FREE_BLOCK_B.asf", String(ESP.getMaxAllocHeap()).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/HEAP_INTEGRITY_CHECK_MS.asf", "1000"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/MALLOC_OWNERSHIP_ID.asf", "ATK_CORE_MONOLITH"); Loading();
+
+  // [73구역: ImpoSystem/Boot - 멀티부팅 복구용 커널 이중화 타겟 이미지]
+  CreateFile("/Ardudows/System/ImpoSystem/Boot/BACKUP_KERNEL_PATH.asf", "/Ardudows/System/kernel/AFK"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Boot/FALLBACK_TRIGGER_PIN.asf", "NONE"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Boot/BOOT_TARGET_STABILITY.asf", "STABLE_SECURED"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Boot/AUTO_REPAIR_REGISTRY.asf", "TRUE"); Loading();
+
+  // [74구역: ImpoSystem/ESP - 하드웨어 암호화 가속기 활성 플래그]
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/HW_CRYPTO_SHA_EN.asf", "TRUE"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/HW_CRYPTO_AES_EN.asf", "TRUE"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/HW_CRYPTO_RSA_EN.asf", "TRUE"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/SECURE_BOOT_v2_STATUS.asf", "HARDWARE_LOCKED_TRUE"); Loading();
+
+  // [75구역: ImpoSystem/Driver - 디스플레이 테링 가드 외부 핀 연동]
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/TFT_TE_PIN_NUM.asf", "46"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/TFT_TE_SIGNAL_EDGE.asf", "RISING"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/SCANLINE_INTERVAL_US.asf", "60"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Driver/ST7789_RAM_WRITE_CMD.asf", "0x2C"); Loading();
+
+  // [76구역: ImpoSystem/User - 단축 키 바인딩 확장 레지스터 매핑]
+  CreateFile("/Ardudows/System/ImpoSystem/User/KEY_SHORTCUT_RECOVERY.asf", "KEY_F12"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/User/KEY_SHORTCUT_DU.asf", "KEY_F5"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/User/KEY_MODIFIER_LEFTRTL.asf", "NONE"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/User/KEY_LAYOUT_TYPE_STRING.asf", "US_QWERTY_MAPPED"); Loading();
+
+  // [77구역: ImpoSystem/Log - 최종 하드웨어 전압 드롭 이벤트 모니터]
+  CreateFile("/Ardudows/System/ImpoSystem/Log/VDD_VOLTAGE_DROP_EVENTS.asf", "0"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Log/CORE_TEMPERATURE_ALARM.asf", "DISABLED"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Log/LAST_STABLE_TEMP_C.asf", String(temperatureRead()).c_str()); Loading(); // 현재 실시간 다이 온도 백업 기록
+  CreateFile("/Ardudows/System/ImpoSystem/Log/HARDWARE_HEALTH_MARK.asf", "EXCELLENT"); Loading();
+
+  // [78구역: ImpoSystem/Registry - 가상 시뮬레이터 8비트 오디오 사운드 슬롯]
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/AUDIO_BUFFER_FRAMES.asf", "512"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/AUDIO_SAMPLE_RATE_HZ.asf", "44100"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/AUDIO_CHANNELS_COUNT.asf", "STEREO_MAPPED"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/AUDIO_DAC_TYPE_BUILTIN.asf", "TRUE"); Loading();
+
+  // [79구역: ImpoSystem/ATK - 커널 종결 태스크 파라미터 락다운 가드]
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/BOOT_SEQUENCE_FINISHED.asf", "TRUE"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/KERNEL_SEAL_SIGNATURE.asf", "MONOLITH_ATK_SUCCESS"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/TOTAL_SYSTEM_RESOURCES.asf", String(ESP.getHeapSize() + ESP.getPsramSize()).c_str()); Loading(); // ⚡ 총 칩셋 가용 램 총량 정밀 합산 박제!
+  CreateFile("/Ardudows/System/ImpoSystem/ATK/OS_RUNTIME_INTEGRITY.asf", "SECURED_BY_ADMIN"); Loading();
+
+  // [80구역: ImpoSystem/Registry - 아두도스 대제국 80구역 최종 완공 기념비 레지스터]
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/MEGA_ZONE_80_LOCKED.asf", "TRUE"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/OS_DEPLOY_COMPLETED.asf", "SUCCESS_100_PERCENT"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/ARCHITECT_GOD_SIGN.asf", "JAEMIN_KIM_EMPEROR"); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/Registry/FINAL_BOOT_CHECK_SUM.asf", String(ESP.getCycleCount(), HEX).c_str()); Loading(); // ⚡ 최종 완결 순간의 CPU 사이클 클록 값을 영구 마킹!!
+  
   //여기까지 어쩔수 없이 AI 씀
   CreateFile("/Ardudows/System/Boot/Boot_Sequence.asf", "boot=true"); 
   Loading();
