@@ -2480,6 +2480,7 @@ void ArduBios() {
   tft.setTextSize(2);
   tft.println("Ardudows BIOS");
   tft.println("----------------");
+  delay(500);
   File_Check();
   //ATT();
   delay(400);
