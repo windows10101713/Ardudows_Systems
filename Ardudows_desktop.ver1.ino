@@ -2514,6 +2514,7 @@ void ArduBios() {
 //===바이오스 정보창===
 void Firmware_Information() {
   tft.fillScreen(TFT_BLACK);
+  tft.setTextColor(TFT_WHITE);
   tft.print("Ardu");
   tft.print(Firmware);
   tft.print(" ver : ");
@@ -10184,21 +10185,42 @@ void executeCommand(String cmd) {
   // 52. 파일 시스템 내 모든 파일의 개수와 총 사용 용량 산출 (Du)
   else if (cmd == "du") {
     tft.println(">> CALCULATING DISK USAGE...");
-    uint32_t totalSize = 0;
+  
+    // 🔄 누적할 카운터 변수 초기화
     uint32_t fileCount = 0;
+    uint32_t totalSize = 0;
+
+    // 최상위 루트 디렉터리 오픈
     File root = SD.open("/");
-    File file = root.openNextFile();
-    while (file) {
-      if (!file.isDirectory()) {
-        totalSize += file.size();
-        fileCount++;
+
+    // 🔥 [커널 람다식 재귀 스캐너] 하위 폴더가 있으면 지가 알아서 파고드는 내부 함수
+    // 람다 함수 구조를 써서 cmd 내부에서 깔끔하게 종결시켰습니다.
+    auto scanDirectory = [&](auto& self, File dir) -> void {
+      File file = dir.openNextFile();
+      while (file) {
+        if (file.isDirectory()) {
+          // 📂 폴더를 만나면? "어허, 이 자식 보소? 안쪽도 싹 다 긁어와!" (재귀 호출)
+          self(self, file); 
+        } else {
+        // 📄 파일을 만나면? 묻지도 따지지도 말고 크기와 개수 누적!
+         totalSize += file.size();
+         fileCount++;
+        }
+       file.close(); // 메모리 누수 방지용 칼같은 가드 닫기
+       file = dir.openNextFile(); // 다음 자진출두 파일 낚아채기
       }
-      file = root.openNextFile();
-    }
-    root.close();
-    tft.printf(">> Total Files: %lu\n", fileCount);
-    tft.printf(">> Used Space : %.2f MB\n", (float)totalSize / (1024.0f * 1024.0f));
-  }
+    };
+
+   // 🚀 전수 조사 엔진 스타트!!
+   if (root) {
+     scanDirectory(scanDirectory, root);
+     root.close();
+   }
+
+   // 📺 윈도우 속성창과 100% 동기화된 리얼 하드웨어 스펙 출력!
+   tft.printf(">> Total Files: %lu\n", fileCount);
+   tft.printf(">> Used Space : %.2f MB\n", (float)totalSize / (1024.0f * 1024.0f));
+   }
 
   // 53. 파일의 내용을 거꾸로(뒤에서부터) 출력 (Reverse Cat)
   else if (cmd.startsWith("tac ")) {
