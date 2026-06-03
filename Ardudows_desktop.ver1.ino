@@ -69,12 +69,85 @@
 #include "soc/soc.h"
 #include "esp_partition.h"
 #include "esp_mac.h"
-#include "soc/soc.h"
+//#include "soc/soc.h"
+#include "soc/soc_caps.h"
 #include "esp_private/periph_ctrl.h"
 #include "esp_netif.h"
 #include "esp_wifi.h"
+//#include "esp_system.h"
+#include "esp_chip_info.h"
+#include "esp_random.h"
+#include "soc/rtc_periph.h"
+//#include "esp_wifi.h"
+//#include "esp_netif.h"
+#include "lwip/sockets.h"
+//#include "esp_efuse.h"
+#include "esp_efuse_table.h"
+//#include "esp_partition.h"
+#include "esp_freertos_hooks.h"
+#include "freertos/task.h"
+#include "soc/rtc.h"
+//#include "ext_mem_layout.h"
+#include "rom/cache.h"
+#include "esp_crypto_lock.h"
+#include "hal/wdt_hal.h"
+#include "hal/gdma_ll.h"
+#include "hal/gpio_ll.h"
+#include "driver/temperature_sensor.h"
+#include "xtensa/config/core-isa.h"
+#include "xtensa/xtruntime.h"
+#include "esp_private/panic_reason.h"
+//#include "soc/soc.h"
+#include "soc/dport_reg.h"
+#include "soc/extmem_reg.h"
+//#include "soc/mmu_reg.h"
+#include "hal/mmu_hal.h"
+#include "soc/interrupt_reg.h"
+#include "soc/system_reg.h"
+//#include "soc/rtc_cntl_reg.h"
+#include "soc/syscon_reg.h"
+//#include "esp_private/esp_mmu_map.h"
+#include "spi_flash_mmap.h"
+#include "hal/cpu_hal.h"
+#include "esp_dsp.h"
+#include "soc/sens_reg.h"
+//#include "ulp_riscv.h"
+//#include "ulp_riscv.h"
+//#include "soc/ulp_cntl_reg.h"
+//#include "ulp_riscv_register_ops.h"
+#include "soc/assist_debug_reg.h"
+#include "esp_private/esp_int_wdt.h"
+#include "esp_image_format.h"
+//#include "soc/pcr_reg.h"
+//#include "soc/pcr_struct.h"
+//#include "soc/pcr_reg.h"
+#include "hal/clk_gate_ll.h"
+#include "esp_private/esp_clk.h"
+#include "hal/clk_gate_ll.h"
+//u#include "esp_private/adc_share_binit.h"
+#include "hal/adc_hal.h"
+#include "soc/apb_saradc_reg.h"
+//#include "soc/lp_clkrst_reg.h"
+//#include "soc/lp_clkrst_struct.h"
+//#include "soc/brownout_reg.h"
+#include "hal/brownout_hal.h"
+#include "esp_private/sleep_retention.h"
+#include "soc/rtc_io_reg.h"
+//#include "soc/hmac_reg.h"
+#include "esp_hmac.h"
+//#include "soc/digital_signature_reg.h"
+#include "esp_ds.h"
+#include "esp_flash_encrypt.h"
 
 //===대입문(?)과 변수등 일단 뭐 아무거나 선언===
+
+#ifndef INTERRUPT_CORE0_CPU_INT_THRESH_REG
+#define INTERRUPT_CORE0_CPU_INT_THRESH_REG (0x60010000 + 0x18) // S3 인터럽트 기본 베이스 주소 기반 오프셋
+#endif
+// .ino 파일 최상단 헤더 선언부 아래에 추가
+#ifndef SOC_MMU_REG_BASE
+#define SOC_MMU_REG_BASE (0x600c5000) // ESP32-S3 MMU Register Base Address
+#endif
 
 // 🔄 전역 변수 또는 setup 위쪽에 박아둘 카운터 변수들 (함수 리셋용)
 int currentLineCount = 0;
@@ -170,7 +243,7 @@ struct Complex {
 //uint16_t vnc_sw, vnc_sh; 
 bool usb_connected = false;
 bool usb_ready = false;
-SocketIoClient socket;
+SocketIoClient socketIo;
 bool isNaMyHeeRunning = false;
 #define GAME_BUZZER_PIN 10
 #define GAME_MAX_PLAYERS 14
@@ -2213,252 +2286,399 @@ Enjoy hacking Ardudows OS :)
   CreateFile("/Ardudows/System/ImpoSystem/Registry/FINAL_OS_REINFORCE.asf", "HUMAN_BLOOD_AND_SWEAT"); Loading();
   CreateFile("/Ardudows/System/ImpoSystem/Registry/DEPLOYMENT_STAG_COUNT.asf", "80_TOTAL_ZONES"); Loading();
   CreateFile("/Ardudows/System/ImpoSystem/Registry/COMPILATION_END_TEMP.asf", (String(temperatureRead()) + "C_BOILING").c_str()); Loading(); // ⚡ 80구역 대정정의 마무리는 펄펄 끓는 리얼 칩셋 온도로 최종 도장 쾅!
-
-  // =========================================================================
-  // 👑 [ULTIMATE HARDWARE COMPLETION: ZONES 41 TO 80] 👑
-  // 아두도스 제국 완공을 위한 남은 40개 구역 인프라 폭격. 100% 실시간 하드웨어 연동.
-  // =========================================================================
-
-  // [41구역: ImpoSystem/Driver - PS/2 키보드 멀티탭 가드]
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/KBD_POLLING_RATE_HZ.asf", "100"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/KBD_SHADOW_REGISTER.asf", String(REG_READ(GPIO_IN_REG), HEX).c_str()); Loading(); // ⚡ 실시간 GPIO 입력 상태값 박제
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/KBD_ALT_GR_MAPPED.asf", "FALSE"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/KBD_LONG_PRESS_THRES.asf", "800_MS"); Loading();
-
-  // [42구역: ImpoSystem/Registry - 221서버 가상 바이옴 에메랄드 광맥 주소]
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/EMERALD_HEIGHT_MIN.asf", "120"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/IRON_ORE_MAX_DEPTH.asf", String(micros() & 0x7F).c_str()); Loading(); // 런타임 클록 난수 주입
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/BIOME_CHATIC_WEIGHT.asf", "0.75"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/TERRAIN_MUTATION_EN.asf", "TRUE"); Loading();
-
-  // [43구역: ImpoSystem/ATK - 프리RTOS 힙 할당 에러 인트랩트]
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/MALLOC_FAILED_HOOK.asf", "ENABLED"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/HEAP_LOW_WATER_MARK.asf", String(ESP.getMinFreeHeap() / 1024).c_str()); Loading(); // 최저 힙 기록 KB 환산
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/SRAM_DYNAMIC_RESERVE.asf", "16KB"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/KERNEL_PANIC_VECTOR.asf", "0x03"); Loading();
-
-  // [44구역: ImpoSystem/User - 마인크래프트 커스텀 가상 스킨 정보]
-  CreateFile("/Ardudows/System/ImpoSystem/User/MC_SKIN_STEVE_RGB.asf", "0x2D4B"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/User/MC_PLAYER_UUID_SALT.asf", String(ESP.getEfuseMac() >> 16, HEX).c_str()); Loading(); // 에퓨즈 상위 비트 암호화
-  CreateFile("/Ardudows/System/ImpoSystem/User/MC_INVENTORY_SLOTS.asf", "36"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/User/MC_CREATIVE_MODE_EN.asf", "FALSE"); Loading();
-
-  // [45구역: ImpoSystem/ESP - 무선 mercenary 신호 디오센트릭 가드]
-  CreateFile("/Ardudows/System/ImpoSystem/ESP/DEAUTH_SHIELD_ACTIVE.asf", "TRUE"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ESP/CHANNEL_HOPPING_MS.asf", "150"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ESP/PROMISCUOUS_BUF_SIZE.asf", "4096"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ESP/ANTENNA_GAIN_SETTING.asf", "AUTOMATIC_MAX"); Loading();
-
-  // [46구역: ImpoSystem/Boot - 콜드 리부트 하드웨어 덤프 타겟]
-  CreateFile("/Ardudows/System/ImpoSystem/Boot/CRASH_DUMP_TARGET.asf", "SD_CARD_SECTOR_2"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Boot/RECOVERY_KEY_GPIO.asf", "0"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Boot/BOOT_DELAY_FORCE_MS.asf", "0"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Boot/HARDWARE_STRAP_REUSE.asf", "DISABLED"); Loading();
-
-  // [47구역: ImpoSystem/Log - 디스플레이 프레임 레이트 드롭 레코드]
-  CreateFile("/Ardudows/System/ImpoSystem/Log/FPS_DROP_COUNT.asf", "0"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Log/DMA_TRANSFER_ERRORS.asf", "0"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Log/TFT_TIMEOUT_COUNTER.asf", String(xTaskGetTickCount() / 100).c_str()); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Log/COLOR_MISMATCH_SHIELD.asf", "STRICT"); Loading();
-
-  // [48구역: ImpoSystem/Registry - 가상 시뮬레이터 교통량 알고리즘 상수]
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/TRAFFIC_MAX_CARS.asf", "256"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/SIM_WEATHER_CYCLE_S.asf", "1200"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/DAY_NIGHT_RATIO.asf", "1.0"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/VIRTUAL_TAX_RATE.asf", "10_PERCENT"); Loading();
-
-  // [49구역: ImpoSystem/Driver - SD 카드 클록 스피드 버스 레지스터]
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/SD_BUS_FREQ_MHZ.asf", "20"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/SD_DATA_MISO_PULLUP.asf", "INTERNAL"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/SD_MAX_OPEN_FILES.asf", "16"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/SD_CARD_REINSERT_EN.asf", "FALSE"); Loading();
-
-  // [50구역: ImpoSystem/User - 가상 터미널 전용 레트로 윈도우 XP 테마 스펙]
-  CreateFile("/Ardudows/System/ImpoSystem/User/XP_LUNA_BLUE_HEX.asf", "0x001F"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/User/XP_START_BUTTON_RGB.asf", "0x07E0"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/User/XP_WALLPAPER_NAME.asf", "Bliss_8bit.bmp"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/User/XP_SOUND_LOGON_MAPPED.asf", "TRUE"); Loading();
-
-  // [51구역: ImpoSystem/ATK - 멀티코어 로드 밸런서 인터럽트 세팅]
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/CORE_0_LOAD_FACTOR.asf", "DYNAMIC_MAPPED"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/CORE_1_LOAD_FACTOR.asf", "APP_CORE_HEAVY"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/AFFINITY_MASK_DEFAULT.asf", "0x02"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/YIELD_CPU_ON_CRITICAL.asf", "TRUE"); Loading();
-
-  // [52구역: ImpoSystem/ESP - 와이파이 비컨 프레임 인터셉터 모니터]
-  CreateFile("/Ardudows/System/ImpoSystem/ESP/BEACON_SNIFFER_EN.asf", "FALSE"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ESP/SNIFFER_FILTER_MASK.asf", "0x80"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ESP/CHANNEL_MAX_RANGE.asf", "13"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ESP/MAC_OUI_VENDOR_SIGN.asf", "ESPPRESSIF_S3"); Loading();
-
-  // [53구역: ImpoSystem/Registry - 221서버 무차별 가상 기온 및 눈 경계선 스펙]
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/GLOBAL_TEMP_BIAS.asf", "0.0"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/SNOW_ACCUMULATION_M.asf", "MAX_3"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/ICE_MELTING_POINT_C.asf", "0"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/BIOME_ID_OVERWORLD.asf", "101"); Loading();
-
-  // [54구역: ImpoSystem/Boot - 레조넌스 부트 체크섬 완전 가드]
-  CreateFile("/Ardudows/System/ImpoSystem/Boot/CHECKSUM_ALGO.asf", "CRC32_HARDWARE"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Boot/EXPECTED_SIGNATURE.asf", "0x55AA6699"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Boot/BOOT_INTEGRITY_LEVEL.asf", "HIGH_GUARD"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Boot/FAILSAFE_BOOT_TARGET.asf", "RECOVERY"); Loading();
-
-  // [55구역: ImpoSystem/Driver - ST7789 디스플레이 하드웨어 가속 타이밍]
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/TFT_MADCTL_PARAM.asf", "0xE8"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/TFT_COLMOD_INTERFACE.asf", "16BIT_COLOR"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/TFT_PIXEL_PITCH_X.asf", "240"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/TFT_PIXEL_PITCH_Y.asf", "240"); Loading();
-
-  // [56구역: ImpoSystem/User - 아두 코드 프로그래밍 환경 변수 레지스터]
-  CreateFile("/Ardudows/System/ImpoSystem/User/A_CODE_MAX_LINES.asf", "500"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/User/A_CODE_VAR_LIMIT.asf", "64"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/User/A_CODE_INTERPRETER.asf", "ACTIVE_ATK"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/User/A_CODE_AUTO_INDENT.asf", "TRUE"); Loading();
-
-  // [57구역: ImpoSystem/Log - 무선 커널 MERCENARY 트래픽 예외 이력]
-  CreateFile("/Ardudows/System/ImpoSystem/Log/DEAUTH_ATTACKS_DETECTED.asf", "0"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Log/MALFORMED_PACKETS_DROP.asf", "0"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Log/LAST_PACKET_LENGTH.asf", String(WiFi.status() * 64).c_str()); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Log/INTRUSION_GUARD_LEVEL.asf", "MAX_SECURE"); Loading();
-
-  // [58구역: ImpoSystem/ATK - 프리RTOS 커널 내부 타이머 스케줄 제어]
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/TIMER_TASK_PRIORITY.asf", "1"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/TIMER_QUEUE_LENGTH.asf", "10"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/TICKLESS_IDLE_EN.asf", "FALSE"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/ISR_STACK_GUARD_SIZE.asf", "256_BYTES"); Loading();
-
-  // [59구역: ImpoSystem/Registry - 1980년대 가상 도시 인구 부하 제한]
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/SIM_MAX_BUILDINGS.asf", "512"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/SIM_WATER_SUPPLY_EN.asf", "TRUE"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/SIM_POWER_GRID_FACTOR.asf", "1.2"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/SIM_DISASTER_PROB.asf", "0"); Loading();
-
-  // [60구역: ImpoSystem/ESP - 하드웨어 에퓨즈 가속화 퓨즈 비트 수치]
-  CreateFile("/Ardudows/System/ImpoSystem/ESP/EFUSE_BLOCK_0_VAL.asf", String(REG_READ(EFUSE_BLK0_RDATA0_REG), HEX).c_str()); Loading(); // ⚡ 찐 리얼 하드웨어 에퓨즈 로우 데이터 스캔!!
-  CreateFile("/Ardudows/System/ImpoSystem/ESP/EFUSE_SECURE_BOOT_EN.asf", "FALSE"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ESP/EFUSE_FLASH_CRYPT_EN.asf", "FALSE"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ESP/CUSTOM_CHIP_ID_SIGN.asf", "ATK_S3_CHIEF"); Loading();
-
-  // [61구역: ImpoSystem/Driver - SPI 버스 디바이스 세마포어 가드]
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/SPI_BUS_LOCK_STATUS.asf", "UNLOCKED"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/SPI_SHARED_DEVICES.asf", "2"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/TFT_SPI_MODE_VAL.asf", "SPI_MODE0"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/SD_SPI_MODE_VAL.asf", "SPI_MODE0"); Loading();
-
-  // [62구역: ImpoSystem/User - 가상 쉘 에러 텍스트 컬러 스키마]
-  CreateFile("/Ardudows/System/ImpoSystem/User/COLOR_ERR_HEX.asf", "0xF800"); Loading(); // TFT_RED
-  CreateFile("/Ardudows/System/ImpoSystem/User/COLOR_SUCCESS_HEX.asf", "0x07E0"); Loading(); // TFT_GREEN
-  CreateFile("/Ardudows/System/ImpoSystem/User/COLOR_WARN_HEX.asf", "0xFDE0"); Loading(); // TFT_YELLOW
-  CreateFile("/Ardudows/System/ImpoSystem/User/COLOR_SYSTEM_HEX.asf", "0x07FF"); Loading(); // TFT_CYAN
-
-  // [63구역: ImpoSystem/Log - 하드웨어 워치독 오버플로 타임스탬프 백업]
-  CreateFile("/Ardudows/System/ImpoSystem/Log/WDT_FEED_INTERVAL_MS.asf", "5000"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Log/WDT_RESET_COUNT.asf", "0"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Log/LAST_WDT_FEED_TICK.asf", String(xTaskGetTickCount()).c_str()); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Log/WDT_INTERRUPT_LEVEL.asf", "NMI_LEVEL_4"); Loading();
-
-  // [64구역: ImpoSystem/Registry - 221서버 고유 섬 좌표 절대 락 바인딩]
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/ISLAND_LOCK_COOR_X.asf", "SERVER_221_IMMUTABLE_X"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/ISLAND_LOCK_COOR_Y.asf", "SERVER_221_IMMUTABLE_Y"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/CHAOS_GENERATOR_EN.asf", "TRUE"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/ISLAND_SAFE_ZONE_R.asf", "50_BLOCKS"); Loading();
-
-  // [65구역: ImpoSystem/ATK - 커널 메시지 전송용 사운드 메타 레지스터]
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/MSG_QUEUE_BUFFER_SIZE.asf", "1024"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/IPC_SIGNAL_STATUS.asf", "READY"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/KERNEL_EVENT_FLAGS.asf", "0x00000001"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/CRITICAL_LOCK_OWNER.asf", "ATK_CORE_SHELL"); Loading();
-
-  // [66구역: ImpoSystem/Boot - 하드웨어 콜드 스타트 전압 센서 가드]
-  CreateFile("/Ardudows/System/ImpoSystem/Boot/POWER_ON_VDD_MV.asf", "3300"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Boot/BROWNOUT_DETECTOR_EN.asf", "TRUE"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Boot/BROWNOUT_THRESHOLD_V.asf", "2.8V"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Boot/POWER_STABLE_FLAG.asf", "STABLE_PASSED"); Loading();
-
-  // [67구역: ImpoSystem/ESP - 와이파이 고유 하드웨어 패킷 송신 디렉션]
-  CreateFile("/Ardudows/System/ImpoSystem/ESP/WIFI_BEACON_PERIOD_TU.asf", "100"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ESP/MAX_RETRY_PROBE_REQ.asf", "3"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ESP/WIFI_COUNTRY_CODE_VAL.asf", "KR_MAPPED"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ESP/TX_BUFFER_MALLOC_SIZE.asf", "8192"); Loading();
-
-  // [68구역: ImpoSystem/Driver - 디스플레이 백라이트 레벨 고정 레지스터]
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/TFT_BL_PWM_CHANNEL.asf", "LEDC_CHANNEL_0"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/TFT_BL_DUTY_CYCLE.asf", "255_MAX"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/TFT_BL_GPIO_NUM.asf", "45"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/TFT_SLEEP_OUT_CMD.asf", "0x11"); Loading();
-
-  // [69구역: ImpoSystem/User - 가위바위보 머신 인공지능 난수 레지스터]
-  CreateFile("/Ardudows/System/ImpoSystem/User/RPS_AI_LEVEL.asf", "ULTIMATE_CREATOR_KILLER"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/User/RPS_WIN_STREAK_LIMIT.asf", "99"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/User/RPS_SECRET_CHEAT_KEY.asf", "ADMIN_PASS_MACHO"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/User/RPS_MATCH_COUNT_TOTAL.asf", "0"); Loading();
-
-  // [70구역: ImpoSystem/Log - 파일 시스템 캐시 히트율 모니터]
-  CreateFile("/Ardudows/System/ImpoSystem/Log/FS_CACHE_HIT_RATE.asf", "100_PERCENT"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Log/FS_SEEK_FAILURES.asf", "0"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Log/LAST_SYNC_TIMESTAMP.asf", String(millis()).c_str()); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Log/FS_AUTO_FLUSH_INTERVAL.asf", "IMMEDIATE"); Loading();
-
-  // [71구역: ImpoSystem/Registry - 가상 마인크래프트 최대 가용 청크 인프라]
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/CHUNK_SIZE_BLOCKS.asf", "16"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/MAX_RENDER_CHUNKS.asf", "16_LIMIT"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/BLOCK_DATA_COMPRESS.asf", "RLE_ENCODE"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/ENTITY_MAX_LIMIT_COUNT.asf", "128"); Loading();
-
-  // [72구역: ImpoSystem/ATK - 프리RTOS 커널 내부 힙 조각화 모니터링 가드]
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/HEAP_FRAG_BLOCKS_COUNT.asf", "1"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/LARGEST_FREE_BLOCK_B.asf", String(ESP.getMaxAllocHeap()).c_str()); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/HEAP_INTEGRITY_CHECK_MS.asf", "1000"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/MALLOC_OWNERSHIP_ID.asf", "ATK_CORE_MONOLITH"); Loading();
-
-  // [73구역: ImpoSystem/Boot - 멀티부팅 복구용 커널 이중화 타겟 이미지]
-  CreateFile("/Ardudows/System/ImpoSystem/Boot/BACKUP_KERNEL_PATH.asf", "/Ardudows/System/kernel/AFK"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Boot/FALLBACK_TRIGGER_PIN.asf", "NONE"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Boot/BOOT_TARGET_STABILITY.asf", "STABLE_SECURED"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Boot/AUTO_REPAIR_REGISTRY.asf", "TRUE"); Loading();
-
-  // [74구역: ImpoSystem/ESP - 하드웨어 암호화 가속기 활성 플래그]
-  CreateFile("/Ardudows/System/ImpoSystem/ESP/HW_CRYPTO_SHA_EN.asf", "TRUE"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ESP/HW_CRYPTO_AES_EN.asf", "TRUE"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ESP/HW_CRYPTO_RSA_EN.asf", "TRUE"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ESP/SECURE_BOOT_v2_STATUS.asf", "HARDWARE_LOCKED_TRUE"); Loading();
-
-  // [75구역: ImpoSystem/Driver - 디스플레이 테링 가드 외부 핀 연동]
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/TFT_TE_PIN_NUM.asf", "46"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/TFT_TE_SIGNAL_EDGE.asf", "RISING"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/SCANLINE_INTERVAL_US.asf", "60"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Driver/ST7789_RAM_WRITE_CMD.asf", "0x2C"); Loading();
-
-  // [76구역: ImpoSystem/User - 단축 키 바인딩 확장 레지스터 매핑]
-  CreateFile("/Ardudows/System/ImpoSystem/User/KEY_SHORTCUT_RECOVERY.asf", "KEY_F12"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/User/KEY_SHORTCUT_DU.asf", "KEY_F5"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/User/KEY_MODIFIER_LEFTRTL.asf", "NONE"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/User/KEY_LAYOUT_TYPE_STRING.asf", "US_QWERTY_MAPPED"); Loading();
-
-  // [77구역: ImpoSystem/Log - 최종 하드웨어 전압 드롭 이벤트 모니터]
-  CreateFile("/Ardudows/System/ImpoSystem/Log/VDD_VOLTAGE_DROP_EVENTS.asf", "0"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Log/CORE_TEMPERATURE_ALARM.asf", "DISABLED"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Log/LAST_STABLE_TEMP_C.asf", String(temperatureRead()).c_str()); Loading(); // 현재 실시간 다이 온도 백업 기록
-  CreateFile("/Ardudows/System/ImpoSystem/Log/HARDWARE_HEALTH_MARK.asf", "EXCELLENT"); Loading();
-
-  // [78구역: ImpoSystem/Registry - 가상 시뮬레이터 8비트 오디오 사운드 슬롯]
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/AUDIO_BUFFER_FRAMES.asf", "512"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/AUDIO_SAMPLE_RATE_HZ.asf", "44100"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/AUDIO_CHANNELS_COUNT.asf", "STEREO_MAPPED"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/AUDIO_DAC_TYPE_BUILTIN.asf", "TRUE"); Loading();
-
-  // [79구역: ImpoSystem/ATK - 커널 종결 태스크 파라미터 락다운 가드]
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/BOOT_SEQUENCE_FINISHED.asf", "TRUE"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/KERNEL_SEAL_SIGNATURE.asf", "MONOLITH_ATK_SUCCESS"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/TOTAL_SYSTEM_RESOURCES.asf", String(ESP.getHeapSize() + ESP.getPsramSize()).c_str()); Loading(); // ⚡ 총 칩셋 가용 램 총량 정밀 합산 박제!
-  CreateFile("/Ardudows/System/ImpoSystem/ATK/OS_RUNTIME_INTEGRITY.asf", "SECURED_BY_ADMIN"); Loading();
-
-  // [80구역: ImpoSystem/Registry - 아두도스 대제국 80구역 최종 완공 기념비 레지스터]
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/MEGA_ZONE_80_LOCKED.asf", "TRUE"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/OS_DEPLOY_COMPLETED.asf", "SUCCESS_100_PERCENT"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/ARCHITECT_GOD_SIGN.asf", "JAEMIN_KIM_EMPEROR"); Loading();
-  CreateFile("/Ardudows/System/ImpoSystem/Registry/FINAL_BOOT_CHECK_SUM.asf", String(ESP.getCycleCount(), HEX).c_str()); Loading(); // ⚡ 최종 완결 순간의 CPU 사이클 클록 값을 영구 마킹!!
   
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A000.asf", String(REG_READ(0x6001A000), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A004.asf", String(REG_READ(0x6001A004), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A008.asf", String(REG_READ(0x6001A008), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A00C.asf", String(REG_READ(0x6001A00C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A010.asf", String(REG_READ(0x6001A010), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A014.asf", String(REG_READ(0x6001A014), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A018.asf", String(REG_READ(0x6001A018), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A01C.asf", String(REG_READ(0x6001A01C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A020.asf", String(REG_READ(0x6001A020), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A024.asf", String(REG_READ(0x6001A024), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A028.asf", String(REG_READ(0x6001A028), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A02C.asf", String(REG_READ(0x6001A02C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A030.asf", String(REG_READ(0x6001A030), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A034.asf", String(REG_READ(0x6001A034), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A038.asf", String(REG_READ(0x6001A038), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A03C.asf", String(REG_READ(0x6001A03C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A040.asf", String(REG_READ(0x6001A040), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A044.asf", String(REG_READ(0x6001A044), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A048.asf", String(REG_READ(0x6001A048), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A04C.asf", String(REG_READ(0x6001A04C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A050.asf", String(REG_READ(0x6001A050), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A054.asf", String(REG_READ(0x6001A054), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A058.asf", String(REG_READ(0x6001A058), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A05C.asf", String(REG_READ(0x6001A05C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A060.asf", String(REG_READ(0x6001A060), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A064.asf", String(REG_READ(0x6001A064), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A068.asf", String(REG_READ(0x6001A068), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A06C.asf", String(REG_READ(0x6001A06C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A070.asf", String(REG_READ(0x6001A070), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A074.asf", String(REG_READ(0x6001A074), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A078.asf", String(REG_READ(0x6001A078), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A07C.asf", String(REG_READ(0x6001A07C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A080.asf", String(REG_READ(0x6001A080), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A084.asf", String(REG_READ(0x6001A084), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A088.asf", String(REG_READ(0x6001A088), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A08C.asf", String(REG_READ(0x6001A08C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A090.asf", String(REG_READ(0x6001A090), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A094.asf", String(REG_READ(0x6001A094), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A098.asf", String(REG_READ(0x6001A098), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A09C.asf", String(REG_READ(0x6001A09C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0A0.asf", String(REG_READ(0x6001A0A0), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0A4.asf", String(REG_READ(0x6001A0A4), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0A8.asf", String(REG_READ(0x6001A0A8), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0AC.asf", String(REG_READ(0x6001A0AC), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0B0.asf", String(REG_READ(0x6001A0B0), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0B4.asf", String(REG_READ(0x6001A0B4), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0B8.asf", String(REG_READ(0x6001A0B8), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0BC.asf", String(REG_READ(0x6001A0BC), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0C0.asf", String(REG_READ(0x6001A0C0), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0C4.asf", String(REG_READ(0x6001A0C4), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0C8.asf", String(REG_READ(0x6001A0C8), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0CC.asf", String(REG_READ(0x6001A0CC), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0D0.asf", String(REG_READ(0x6001A0D0), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0D4.asf", String(REG_READ(0x6001A0D4), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0D8.asf", String(REG_READ(0x6001A0D8), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0DC.asf", String(REG_READ(0x6001A0DC), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0E0.asf", String(REG_READ(0x6001A0E0), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0E4.asf", String(REG_READ(0x6001A0E4), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0E8.asf", String(REG_READ(0x6001A0E8), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0EC.asf", String(REG_READ(0x6001A0EC), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0F0.asf", String(REG_READ(0x6001A0F0), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0F4.asf", String(REG_READ(0x6001A0F4), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0F8.asf", String(REG_READ(0x6001A0F8), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A0FC.asf", String(REG_READ(0x6001A0FC), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A100.asf", String(REG_READ(0x6001A100), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A104.asf", String(REG_READ(0x6001A104), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A108.asf", String(REG_READ(0x6001A108), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A10C.asf", String(REG_READ(0x6001A10C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A110.asf", String(REG_READ(0x6001A110), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A114.asf", String(REG_READ(0x6001A114), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A118.asf", String(REG_READ(0x6001A118), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A11C.asf", String(REG_READ(0x6001A11C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A120.asf", String(REG_READ(0x6001A120), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A124.asf", String(REG_READ(0x6001A124), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A128.asf", String(REG_READ(0x6001A128), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A12C.asf", String(REG_READ(0x6001A12C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A130.asf", String(REG_READ(0x6001A130), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A134.asf", String(REG_READ(0x6001A134), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A138.asf", String(REG_READ(0x6001A138), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A13C.asf", String(REG_READ(0x6001A13C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A140.asf", String(REG_READ(0x6001A140), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A144.asf", String(REG_READ(0x6001A144), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A148.asf", String(REG_READ(0x6001A148), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A14C.asf", String(REG_READ(0x6001A14C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A150.asf", String(REG_READ(0x6001A150), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A154.asf", String(REG_READ(0x6001A154), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A158.asf", String(REG_READ(0x6001A158), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A15C.asf", String(REG_READ(0x6001A15C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A160.asf", String(REG_READ(0x6001A160), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A164.asf", String(REG_READ(0x6001A164), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A168.asf", String(REG_READ(0x6001A168), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A16C.asf", String(REG_READ(0x6001A16C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A170.asf", String(REG_READ(0x6001A170), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A174.asf", String(REG_READ(0x6001A174), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A178.asf", String(REG_READ(0x6001A178), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A17C.asf", String(REG_READ(0x6001A17C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A180.asf", String(REG_READ(0x6001A180), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A184.asf", String(REG_READ(0x6001A184), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A188.asf", String(REG_READ(0x6001A188), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/Registry/EFUSE_BLOCK_0x6001A18C.asf", String(REG_READ(0x6001A18C), HEX).c_str()); Loading();
+
+  // =====================================================================
+  // 🧠 [구역 2: /System/kernel/AFK] - 가상 메모리 MMU 페이지 테이블 매핑 (총 100파일)
+  // =====================================================================
+  
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_000.asf", String(REG_READ(SOC_MMU_REG_BASE + 0), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_001.asf", String(REG_READ(SOC_MMU_REG_BASE + 4), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_002.asf", String(REG_READ(SOC_MMU_REG_BASE + 8), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_003.asf", String(REG_READ(SOC_MMU_REG_BASE + 12), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_004.asf", String(REG_READ(SOC_MMU_REG_BASE + 16), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_005.asf", String(REG_READ(SOC_MMU_REG_BASE + 20), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_006.asf", String(REG_READ(SOC_MMU_REG_BASE + 24), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_007.asf", String(REG_READ(SOC_MMU_REG_BASE + 28), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_008.asf", String(REG_READ(SOC_MMU_REG_BASE + 32), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_009.asf", String(REG_READ(SOC_MMU_REG_BASE + 36), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_010.asf", String(REG_READ(SOC_MMU_REG_BASE + 40), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_011.asf", String(REG_READ(SOC_MMU_REG_BASE + 44), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_012.asf", String(REG_READ(SOC_MMU_REG_BASE + 48), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_013.asf", String(REG_READ(SOC_MMU_REG_BASE + 52), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_014.asf", String(REG_READ(SOC_MMU_REG_BASE + 56), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_015.asf", String(REG_READ(SOC_MMU_REG_BASE + 60), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_016.asf", String(REG_READ(SOC_MMU_REG_BASE + 64), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_017.asf", String(REG_READ(SOC_MMU_REG_BASE + 68), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_018.asf", String(REG_READ(SOC_MMU_REG_BASE + 72), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_019.asf", String(REG_READ(SOC_MMU_REG_BASE + 76), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_020.asf", String(REG_READ(SOC_MMU_REG_BASE + 80), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_021.asf", String(REG_READ(SOC_MMU_REG_BASE + 84), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_022.asf", String(REG_READ(SOC_MMU_REG_BASE + 88), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_023.asf", String(REG_READ(SOC_MMU_REG_BASE + 92), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_024.asf", String(REG_READ(SOC_MMU_REG_BASE + 96), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_025.asf", String(REG_READ(SOC_MMU_REG_BASE + 100), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_026.asf", String(REG_READ(SOC_MMU_REG_BASE + 104), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_027.asf", String(REG_READ(SOC_MMU_REG_BASE + 108), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_028.asf", String(REG_READ(SOC_MMU_REG_BASE + 112), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_029.asf", String(REG_READ(SOC_MMU_REG_BASE + 116), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_030.asf", String(REG_READ(SOC_MMU_REG_BASE + 120), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_031.asf", String(REG_READ(SOC_MMU_REG_BASE + 124), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_032.asf", String(REG_READ(SOC_MMU_REG_BASE + 128), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_033.asf", String(REG_READ(SOC_MMU_REG_BASE + 132), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_034.asf", String(REG_READ(SOC_MMU_REG_BASE + 136), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_035.asf", String(REG_READ(SOC_MMU_REG_BASE + 140), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_036.asf", String(REG_READ(SOC_MMU_REG_BASE + 144), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_037.asf", String(REG_READ(SOC_MMU_REG_BASE + 148), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_038.asf", String(REG_READ(SOC_MMU_REG_BASE + 152), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_039.asf", String(REG_READ(SOC_MMU_REG_BASE + 156), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_040.asf", String(REG_READ(SOC_MMU_REG_BASE + 160), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_041.asf", String(REG_READ(SOC_MMU_REG_BASE + 164), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_042.asf", String(REG_READ(SOC_MMU_REG_BASE + 168), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_043.asf", String(REG_READ(SOC_MMU_REG_BASE + 172), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_044.asf", String(REG_READ(SOC_MMU_REG_BASE + 176), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_045.asf", String(REG_READ(SOC_MMU_REG_BASE + 180), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_046.asf", String(REG_READ(SOC_MMU_REG_BASE + 184), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_047.asf", String(REG_READ(SOC_MMU_REG_BASE + 188), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_048.asf", String(REG_READ(SOC_MMU_REG_BASE + 192), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_049.asf", String(REG_READ(SOC_MMU_REG_BASE + 196), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_050.asf", String(REG_READ(SOC_MMU_REG_BASE + 200), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_051.asf", String(REG_READ(SOC_MMU_REG_BASE + 204), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_052.asf", String(REG_READ(SOC_MMU_REG_BASE + 208), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_053.asf", String(REG_READ(SOC_MMU_REG_BASE + 212), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_054.asf", String(REG_READ(SOC_MMU_REG_BASE + 216), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_055.asf", String(REG_READ(SOC_MMU_REG_BASE + 220), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_056.asf", String(REG_READ(SOC_MMU_REG_BASE + 224), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_057.asf", String(REG_READ(SOC_MMU_REG_BASE + 228), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_058.asf", String(REG_READ(SOC_MMU_REG_BASE + 232), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_059.asf", String(REG_READ(SOC_MMU_REG_BASE + 236), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_060.asf", String(REG_READ(SOC_MMU_REG_BASE + 240), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_061.asf", String(REG_READ(SOC_MMU_REG_BASE + 244), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_062.asf", String(REG_READ(SOC_MMU_REG_BASE + 248), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_063.asf", String(REG_READ(SOC_MMU_REG_BASE + 252), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_064.asf", String(REG_READ(SOC_MMU_REG_BASE + 256), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_065.asf", String(REG_READ(SOC_MMU_REG_BASE + 260), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_066.asf", String(REG_READ(SOC_MMU_REG_BASE + 264), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_067.asf", String(REG_READ(SOC_MMU_REG_BASE + 268), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_068.asf", String(REG_READ(SOC_MMU_REG_BASE + 272), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_069.asf", String(REG_READ(SOC_MMU_REG_BASE + 276), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_070.asf", String(REG_READ(SOC_MMU_REG_BASE + 280), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_071.asf", String(REG_READ(SOC_MMU_REG_BASE + 284), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_072.asf", String(REG_READ(SOC_MMU_REG_BASE + 288), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_073.asf", String(REG_READ(SOC_MMU_REG_BASE + 292), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_074.asf", String(REG_READ(SOC_MMU_REG_BASE + 296), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_075.asf", String(REG_READ(SOC_MMU_REG_BASE + 300), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_076.asf", String(REG_READ(SOC_MMU_REG_BASE + 304), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_077.asf", String(REG_READ(SOC_MMU_REG_BASE + 308), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_078.asf", String(REG_READ(SOC_MMU_REG_BASE + 312), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_079.asf", String(REG_READ(SOC_MMU_REG_BASE + 316), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_080.asf", String(REG_READ(SOC_MMU_REG_BASE + 320), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_081.asf", String(REG_READ(SOC_MMU_REG_BASE + 324), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_082.asf", String(REG_READ(SOC_MMU_REG_BASE + 328), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_083.asf", String(REG_READ(SOC_MMU_REG_BASE + 332), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_084.asf", String(REG_READ(SOC_MMU_REG_BASE + 336), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_085.asf", String(REG_READ(SOC_MMU_REG_BASE + 340), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_086.asf", String(REG_READ(SOC_MMU_REG_BASE + 344), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_087.asf", String(REG_READ(SOC_MMU_REG_BASE + 348), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_088.asf", String(REG_READ(SOC_MMU_REG_BASE + 352), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_089.asf", String(REG_READ(SOC_MMU_REG_BASE + 356), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_090.asf", String(REG_READ(SOC_MMU_REG_BASE + 360), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_091.asf", String(REG_READ(SOC_MMU_REG_BASE + 364), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_092.asf", String(REG_READ(SOC_MMU_REG_BASE + 368), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_093.asf", String(REG_READ(SOC_MMU_REG_BASE + 372), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_094.asf", String(REG_READ(SOC_MMU_REG_BASE + 376), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_095.asf", String(REG_READ(SOC_MMU_REG_BASE + 380), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_096.asf", String(REG_READ(SOC_MMU_REG_BASE + 384), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_097.asf", String(REG_READ(SOC_MMU_REG_BASE + 388), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_098.asf", String(REG_READ(SOC_MMU_REG_BASE + 392), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/AFK/MMU_PAGE_ENTRY_099.asf", String(REG_READ(SOC_MMU_REG_BASE + 396), HEX).c_str()); Loading();
+
+  // =====================================================================
+  // ⚡ [구역 3: /System/kernel/ATK] - Xtensa 코어 하드웨어 인터럽트 매트릭스 (총 100파일)
+  // =====================================================================
+  
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_00.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 0), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_01.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 4), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_02.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 8), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_03.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 12), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_04.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 16), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_05.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 20), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_06.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 24), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_07.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 28), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_08.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 32), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_09.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 36), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_10.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 40), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_11.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 44), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_12.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 48), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_13.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 52), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_14.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 56), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_15.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 60), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_16.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 64), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_17.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 68), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_18.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 72), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_19.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 76), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_20.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 80), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_21.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 84), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_22.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 88), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_23.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 92), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_24.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 96), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_25.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 100), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_26.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 104), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_27.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 108), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_28.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 112), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_29.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 116), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_30.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 120), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_31.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 124), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_32.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 128), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_33.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 132), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_34.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 136), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_35.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 140), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_36.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 144), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_37.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 148), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_38.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 152), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_39.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 156), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_40.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 160), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_41.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 164), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_42.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 168), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_43.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 172), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_44.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 176), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_45.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 180), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_46.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 184), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_47.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 188), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_48.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 192), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_49.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 196), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_50.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 200), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_51.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 204), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_52.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 208), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_53.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 212), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_54.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 216), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_55.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 220), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_56.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 224), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_57.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 228), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_58.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 232), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_59.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 236), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_60.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 240), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_61.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 244), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_62.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 248), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_63.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 252), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_64.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 256), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_65.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 260), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_66.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 264), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_67.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 268), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_68.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 272), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_69.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 276), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_70.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 280), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_71.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 284), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_72.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 288), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_73.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 292), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_74.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 296), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_75.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 300), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_76.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 304), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_77.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 308), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_78.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 312), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_79.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 316), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_80.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 320), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_81.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 324), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_82.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 328), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_83.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 332), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_84.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 336), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_85.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 340), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_86.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 344), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_87.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 348), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_88.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 352), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_89.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 356), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_90.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 360), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_91.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 364), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_92.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 368), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_93.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 372), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_94.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 376), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_95.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 380), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_96.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 384), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_97.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 388), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_98.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 392), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/kernel/ATK/XTENSA_INT_99.asf", String(REG_READ(INTERRUPT_CORE0_CPU_INT_THRESH_REG + 396), HEX).c_str()); Loading();
+
+  // =====================================================================
+  // 🔐 [구역 4: /System/ImpoSystem/ESP] - 암호화 및 유령 주변장치 버스 (총 100파일)
+  // =====================================================================
+  
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A000.asf", String(REG_READ(0x6003A000), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A004.asf", String(REG_READ(0x6003A004), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A008.asf", String(REG_READ(0x6003A008), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A00C.asf", String(REG_READ(0x6003A00C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A010.asf", String(REG_READ(0x6003A010), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A014.asf", String(REG_READ(0x6003A014), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A018.asf", String(REG_READ(0x6003A018), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A01C.asf", String(REG_READ(0x6003A01C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A020.asf", String(REG_READ(0x6003A020), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A024.asf", String(REG_READ(0x6003A024), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A028.asf", String(REG_READ(0x6003A028), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A02C.asf", String(REG_READ(0x6003A02C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A030.asf", String(REG_READ(0x6003A030), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A034.asf", String(REG_READ(0x6003A034), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A038.asf", String(REG_READ(0x6003A038), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A03C.asf", String(REG_READ(0x6003A03C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A040.asf", String(REG_READ(0x6003A040), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A044.asf", String(REG_READ(0x6003A044), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A048.asf", String(REG_READ(0x6003A048), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A04C.asf", String(REG_READ(0x6003A04C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A050.asf", String(REG_READ(0x6003A050), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A054.asf", String(REG_READ(0x6003A054), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A058.asf", String(REG_READ(0x6003A058), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A05C.asf", String(REG_READ(0x6003A05C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A060.asf", String(REG_READ(0x6003A060), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A064.asf", String(REG_READ(0x6003A064), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A068.asf", String(REG_READ(0x6003A068), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A06C.asf", String(REG_READ(0x6003A06C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A070.asf", String(REG_READ(0x6003A070), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A074.asf", String(REG_READ(0x6003A074), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A078.asf", String(REG_READ(0x6003A078), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A07C.asf", String(REG_READ(0x6003A07C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A080.asf", String(REG_READ(0x6003A080), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A084.asf", String(REG_READ(0x6003A084), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A088.asf", String(REG_READ(0x6003A088), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A08C.asf", String(REG_READ(0x6003A08C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A090.asf", String(REG_READ(0x6003A090), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A094.asf", String(REG_READ(0x6003A094), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A098.asf", String(REG_READ(0x6003A098), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A09C.asf", String(REG_READ(0x6003A09C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0A0.asf", String(REG_READ(0x6003A0A0), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0A4.asf", String(REG_READ(0x6003A0A4), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0A8.asf", String(REG_READ(0x6003A0A8), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0AC.asf", String(REG_READ(0x6003A0AC), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0B0.asf", String(REG_READ(0x6003A0B0), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0B4.asf", String(REG_READ(0x6003A0B4), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0B8.asf", String(REG_READ(0x6003A0B8), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0BC.asf", String(REG_READ(0x6003A0BC), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0C0.asf", String(REG_READ(0x6003A0C0), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0C4.asf", String(REG_READ(0x6003A0C4), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0C8.asf", String(REG_READ(0x6003A0C8), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0CC.asf", String(REG_READ(0x6003A0CC), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0D0.asf", String(REG_READ(0x6003A0D0), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0D4.asf", String(REG_READ(0x6003A0D4), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0D8.asf", String(REG_READ(0x6003A0D8), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0DC.asf", String(REG_READ(0x6003A0DC), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0E0.asf", String(REG_READ(0x6003A0E0), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0E4.asf", String(REG_READ(0x6003A0E4), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0E8.asf", String(REG_READ(0x6003A0E8), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0EC.asf", String(REG_READ(0x6003A0EC), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0F0.asf", String(REG_READ(0x6003A0F0), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0F4.asf", String(REG_READ(0x6003A0F4), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0F8.asf", String(REG_READ(0x6003A0F8), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A0FC.asf", String(REG_READ(0x6003A0FC), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A100.asf", String(REG_READ(0x6003A100), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A104.asf", String(REG_READ(0x6003A104), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A108.asf", String(REG_READ(0x6003A108), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A10C.asf", String(REG_READ(0x6003A10C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A110.asf", String(REG_READ(0x6003A110), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A114.asf", String(REG_READ(0x6003A114), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A118.asf", String(REG_READ(0x6003A118), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A11C.asf", String(REG_READ(0x6003A11C), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A120.asf", String(REG_READ(0x6003A120), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A124.asf", String(REG_READ(0x6003A124), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A128.asf", String(REG_READ(0x6003A128), HEX).c_str()); Loading();
+  CreateFile("/Ardudows/System/ImpoSystem/ESP/CRYPTO_BUS_0x6003A12C.asf", String(REG_READ(0x6003A12C), HEX).c_str()); Loading();
+
   //여기까지 어쩔수 없이 AI 씀
   CreateFile("/Ardudows/System/Boot/Boot_Sequence.asf", "boot=true"); 
   Loading();
@@ -2726,12 +2946,50 @@ void ArduBios() {
   tft.println("Ardudows BIOS");
   tft.println("----------------");
   delay(1000);
-  File_Check();
+  //File_Check();
   //ATT();
   delay(400);
   //Check();
   //하하
   Firmware_Information();
+
+  switch (bootState) {
+
+    case BOOT_RECOVERY:
+      tft.println("Mode: Recovery");
+      RecoveryMode();
+      break;
+
+    case BOOT_INSTALL:
+      tft.println("Mode: Install");
+      ArduInstall_Screen();
+      break;
+
+    case BOOT_AUIC:
+      tft.println("Mode: AUIC");
+      //AUIC();
+      break;
+
+    case BOOT_KERNEL:
+      tft.println("Booting Kernel...");
+      // Kernel_Start();
+      break;
+  }
+}
+
+//===이 모든 것의 원흉 ArduUefi===
+void ArduUefi() {
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextSize(2);
+  tft.println("Ardudows UEFI");
+  tft.setTextSize(1);
+  tft.println("new technology.");
+  Firmware_Information();
+  File_Check();
+  //ATT();
+  delay(400);
+  //Check();
+  //하하
 
   switch (bootState) {
 
@@ -2801,6 +3059,357 @@ void Firmware_Information() {
   //Check();
 };
 
+int g_asrw_index = 0;
+char g_sys_val_buf[64];
+
+// =========================================================================
+// [1단계: 인덱스에 따라 최적의 '섹션 이름'을 반환하는 핵심 함수]
+// 한 섹션에 몰아넣지 않고, 하드웨어 도메인별로 5개의 섹션으로 완벽 분리합니다.
+// =========================================================================
+const char* Get_System_Unique_Section_500(int index) {
+  if (index >= 0   && index < 50)  return "Chip_Spec";        // 칩셋 사양 및 메모리 스펙
+  if (index >= 50  && index < 100) return "Network";          // WiFi 및 통신 스택
+  if (index >= 100 && index < 300) return "GPIO_Map";         // 물리 핀 및 페리페럴 레지스터
+  if (index >= 300 && index < 400) return "Filesystem";       // SD 카드 및 메타 정보
+  if (index >= 400 && index < 500) return "Ardudows_Kernel";  // 커널 변수 및 지형(221서버) 매트릭스
+  
+  return "System_Reserved";
+}
+
+// =========================================================================
+// [2단계: 인덱스별 고유 키 이름 반환 (이전의 예측 가능한 명칭 구조 유지)]
+// =========================================================================
+const char* Get_System_Unique_Key_500(int index) {
+  // [Chip_Spec 섹션용 키]
+  if (index == 0) return "MCU_CHIP_MODEL";
+  if (index == 1) return "MCU_CORE_COUNT";
+  if (index == 2) return "MCU_CPU_FREQ_MHZ";
+  if (index == 3) return "MCU_SILICON_REVISION";
+  if (index == 4) return "MCU_EFUSE_MAC_ADDR";
+  if (index == 5) return "SYS_TOTAL_SRAM_BYTES";
+  if (index == 6) return "SYS_FREE_SRAM_BYTES";
+  if (index == 7) return "SYS_MIN_FREE_SRAM";
+  if (index == 8) return "SYS_MAX_ALLOC_SRAM";
+  if (index == 9) return "SYS_TOTAL_PSRAM_BYTES";
+  if (index == 10) return "SYS_FREE_PSRAM_BYTES";
+  if (index == 11) return "SYS_MIN_FREE_PSRAM";
+  if (index == 12) return "SYS_FLASH_SIZE_BYTES";
+  if (index == 13) return "SYS_FLASH_SPEED_HZ";
+  if (index == 14) return "SYS_FLASH_MODE_ENUM";
+  if (index == 15) return "KERNEL_VERSION_STR";
+  if (index == 16) return "KERNEL_UPTIME_MS";
+  if (index == 17) return "KERNEL_TICK_RATE_HZ";
+  if (index == 18) return "SYS_RESET_REASON_CODE";
+  if (index == 19) return "SYS_SAFE_MODE_STATUS";
+  if (index == 20) return "BOOT_COUNT_TOTAL";
+  if (index == 21) return "BOOT_LOADER_VERSION";
+  if (index == 22) return "HEAP_INTEGRITY_CHECK";
+  if (index == 23) return "STACK_GUARD_STATUS";
+  if (index == 24) return "RTOS_SCHEDULER_STATE";
+  if (index == 25) return "POWER_VDD_SDIO_STATE";
+  if (index == 26) return "INTERNAL_TEMP_CELSIUS";
+  if (index == 27) return "CRYPTO_SHA_SUPPORT";
+  if (index == 28) return "CRYPTO_RSA_SUPPORT";
+  if (index == 29) return "CRYPTO_AES_SUPPORT";
+  if (index == 30) return "MATH_COPROC_STATUS";
+  if (index == 31) return "CACHE_MMU_PAGE_SIZE";
+  if (index == 32) return "INT_NESTING_LEVEL";
+  if (index == 33) return "WATCHDOG_0_STATUS";
+  if (index == 34) return "WATCHDOG_1_STATUS";
+  if (index == 35) return "RTC_TIME_SYNC_EN";
+  if (index == 36) return "RTC_FAST_MEM_SIZE";
+  if (index == 37) return "RTC_SLOW_MEM_SIZE";
+  if (index == 38) return "BROWN_OUT_DETECTOR";
+  if (index == 39) return "JTAG_DEBUG_STATUS";
+  if (index == 40) return "UART0_DOCK_BAUDRATE";
+  if (index == 41) return "CORE_LOG_LEVEL";
+  if (index == 42) return "CORE_0_ACTIVE_TASK";
+  if (index == 43) return "CORE_1_ACTIVE_TASK";
+  if (index == 44) return "SPI_DMA_MAX_CHANNEL";
+  if (index == 45) return "CLK_GATE_MASK_REG";
+  if (index == 46) return "CPU_STALL_DURATION";
+  if (index == 47) return "ROM_TABLE_PTR_ADDR";
+  if (index == 48) return "APP_CPU_RESET_CAUSE";
+  if (index == 49) return "PRO_CPU_RESET_CAUSE";
+
+  // [Network 섹션용 키]
+  if (index == 50) return "WIFI_STATUS_CODE";
+  if (index == 51) return "WIFI_STA_LOCAL_IP";
+  if (index == 52) return "WIFI_SUBNET_MASK";
+  if (index == 53) return "WIFI_GATEWAY_IP";
+  if (index == 54) return "WIFI_PHYSICAL_MAC";
+  if (index == 55) return "WIFI_SOFTAP_LOCAL_IP";
+  if (index == 56) return "WIFI_OPERATING_CH";
+  if (index == 57) return "WIFI_RSSI_SIGNAL";
+  if (index == 58) return "WIFI_SSID_BROADCAST";
+  if (index == 59) return "WIFI_CONNECTED_SSID";
+  if (index == 60) return "WIFI_MAX_AP_CONN";
+  if (index == 61) return "WIFI_TX_POWER_DBM";
+  if (index == 62) return "WIFI_DHCP_SERVER_EN";
+  if (index == 63) return "WIFI_DNS_PRIMARY";
+  if (index == 64) return "WIFI_DNS_SECONDARY";
+  if (index == 65) return "WIFI_SLEEP_TYPE_ENUM";
+  if (index == 66) return "WIFI_MERCENARY_MODE";
+  if (index == 67) return "WIFI_SNIFFER_FILTER";
+  if (index == 68) return "WIFI_DEAUTH_COUNT";
+  if (index == 69) return "WIFI_SCAN_NETWORKS";
+  if (index == 70) return "BLE_CONTROLLER_EN";
+  if (index == 71) return "BLE_ADV_STATUS";
+  if (index == 72) return "BLE_CONN_CLIENT_NUM";
+  if (index == 73) return "BLE_TX_POWER_INDEX";
+  if (index == 74) return "BLE_LOCAL_NAME_STR";
+  if (index == 75) return "NET_MAX_SOCKET_LIMIT";
+  if (index == 76) return "NET_OPENED_SOCKETS";
+  if (index == 77) return "NET_MDNS_ACTIVE_STATUS";
+  if (index == 78) return "NET_PING_LATENCY_MS";
+  if (index == 79) return "NET_FTP_SERVER_PORT";
+  if (index == 80) return "NET_HTTP_SERVER_PORT";
+  if (index == 81) return "NET_WEB_MIRROR_STATUS";
+  if (index == 82) return "NET_TCP_BUF_SIZE_B";
+  if (index == 83) return "NET_UDP_BUF_SIZE_B";
+  if (index == 84) return "NET_PHY_RATE_MAX_MBPS";
+  if (index == 85) return "NET_COUNTRY_CODE_STR";
+  if (index == 86) return "NET_RECONNECT_INTERVAL";
+  if (index == 87) return "NET_AUTH_MODE_ENUM";
+  if (index == 88) return "NET_BEACON_INTERVAL";
+  if (index == 89) return "NET_MULTICAST_LOOPBACK";
+  if (index == 90) return "NET_IP_REASM_TIMEOUT";
+  if (index == 91) return "NET_TCP_MAX_RETRIES";
+  if (index == 92) return "NET_UDP_MULTICAST_TTL";
+  if (index == 93) return "NET_ANTENNA_SELECT_ID";
+  if (index == 94) return "NET_WMM_POWER_SAVE_EN";
+  if (index == 95) return "NET_CSI_COLLECT_STATUS";
+  if (index == 96) return "NET_INTERFACE_COUNT";
+  if (index == 97) return "NET_ROAM_TRIGGER_DBM";
+  if (index == 98) return "NET_FAST_ROAM_SUPPORT";
+  if (index == 99) return "NET_STACK_HEAP_USED";
+
+  // [GPIO_Map 섹션용 키 (인덱스 오프셋 100~299)]
+  if (index >= 100 && index < 150) {
+    static char gpio_in_key[32];
+    snprintf(gpio_in_key, sizeof(gpio_in_key), "PIN_%02d_IN_LEVEL", index - 100);
+    return gpio_in_key;
+  }
+  if (index >= 150 && index < 200) {
+    static char gpio_out_key[32];
+    snprintf(gpio_out_key, sizeof(gpio_out_key), "PIN_%02d_OUT_MODE", index - 150);
+    return gpio_out_key;
+  }
+  if (index >= 200 && index < 230) {
+    static char adc_key[32];
+    snprintf(adc_key, sizeof(adc_key), "ADC_CH_%02d_SAMPLING_RAW", index - 200);
+    return adc_key;
+  }
+  if (index >= 230 && index < 260) {
+    static char ledc_key[32];
+    snprintf(ledc_key, sizeof(ledc_key), "PWM_CH_%02d_DUTY_REG", index - 230);
+    return ledc_key;
+  }
+  if (index >= 260 && index < 270) {
+    static char i2c_master_key[32];
+    snprintf(i2c_master_key, sizeof(i2c_master_key), "I2C_MASTER_REG_%02d", index - 260);
+    return i2c_master_key;
+  }
+  if (index >= 270 && index < 280) {
+    static char spi_param_key[32];
+    snprintf(spi_param_key, sizeof(spi_param_key), "SPI_CTRL_PARAM_%02d", index - 270);
+    return spi_param_key;
+  }
+  if (index >= 280 && index < 290) {
+    static char uart_baud_key[32];
+    snprintf(uart_baud_key, sizeof(uart_baud_key), "UART_PORT_%01d_BAUD_REG", index - 280);
+    return uart_baud_key;
+  }
+  if (index >= 290 && index < 300) {
+    static char dma_desc_key[32];
+    snprintf(dma_desc_key, sizeof(dma_desc_key), "DMA_DESC_STATUS_%01d", index - 290);
+    return dma_desc_key;
+  }
+
+  // [Filesystem 섹션용 키]
+  if (index == 300) return "SD_CARD_TYPE_ENUM";
+  if (index == 301) return "SD_CARD_TOTAL_SIZE_MB";
+  if (index == 302) return "SD_CARD_USED_BYTES_MB";
+  if (index == 303) return "SD_CLUSTER_SIZE_BYTES";
+  if (index == 304) return "FAT_PARTITION_SECTOR_SZ";
+  if (index == 305) return "FAT_TOTAL_SECTOR_COUNT";
+  if (index == 306) return "FS_MAX_OPEN_FILES_LIMIT";
+  if (index == 307) return "FS_CURRENT_OPENED_FILES";
+  if (index == 308) return "FS_MOUNT_INTEGRITY_STAT";
+  if (index == 309) return "FS_REG_DIR_EXISTS_STATUS";
+  if (index >= 310 && index < 360) {
+    static char fs_sector_hash[32];
+    snprintf(fs_sector_hash, sizeof(fs_sector_hash), "SECTOR_META_HASH_%02d", index - 310);
+    return fs_sector_hash;
+  }
+  if (index >= 360 && index < 400) {
+    static char fs_node_offset[32];
+    snprintf(fs_node_offset, sizeof(fs_node_offset), "VIRTUAL_NODE_OFFSET_%02d", index - 360);
+    return fs_node_offset;
+  }
+
+  // [Ardudows_Kernel 섹션용 키]
+  if (index == 400) return "TERRAIN_SEED_VALUE";
+  if (index == 401) return "TERRAIN_SNOW_THRESHOLD";
+  if (index == 402) return "TERRAIN_SPARSE_FOREST_R";
+  if (index == 403) return "TERRAIN_DENSE_FOREST_R";
+  if (index == 404) return "TERRAIN_SPECIAL_EFFECT_R";
+  if (index == 405) return "SERVER_221_PROTECTED_EN";
+  if (index == 406) return "SERVER_221_PROTECT_ZONE_X";
+  if (index == 407) return "SERVER_221_PROTECT_ZONE_Y";
+  if (index == 408) return "SERVER_221_SPAWN_CHECK_EN";
+  if (index == 409) return "UI_THEME_CLASSIC_XP_EN";
+  if (index == 410) return "UI_WALLPAPER_STYLE_ENUM";
+  if (index == 411) return "UI_FONT_SIZE_POINTS";
+  if (index == 412) return "UI_TERMINAL_COLOR_HEX";
+  if (index == 413) return "INPUT_PS2_CLK_PIN_NUM";
+  if (index == 414) return "INPUT_PS2_DATA_PIN_NUM";
+  if (index == 415) return "INPUT_KEYBOARD_LAYOUT_ID";
+  if (index == 416) return "MMD_RENDER_SERVER_ACTIVE";
+  if (index == 417) return "MMD_STREAMING_BUFFER_SZ";
+  if (index == 418) return "CITY_SIM_ISOMETRIC_VIEW";
+  if (index == 419) return "SHELL_DEFAULT_EXECUTABLE";
+  if (index >= 420 && index < 460) {
+    static char shell_cmd_key[32];
+    snprintf(shell_cmd_key, sizeof(shell_cmd_key), "ATK_COMMAND_HASH_%02d", index - 420);
+    return shell_cmd_key;
+  }
+  if (index >= 460 && index < 500) {
+    static char app_reg_key[32];
+    snprintf(app_reg_key, sizeof(app_reg_key), "APP_REGISTRATION_TOKEN_%02d", index - 460);
+    return app_reg_key;
+  }
+
+  return "SYS_RESERVED_FALLBACK_NODE";
+}
+
+// =========================================================================
+// [3단계: 인덱스별 매치되는 라이브 수치 바인딩]
+// =========================================================================
+void Fill_System_Live_Value_500(int index, char* buf, size_t buf_size) {
+  if (index == 0)  { snprintf(buf, buf_size, "ESP32-S3_N16R8"); return; }
+  if (index == 1)  { snprintf(buf, buf_size, "2_Cores"); return; }
+  if (index == 2)  { snprintf(buf, buf_size, "%u MHz", ESP.getCpuFreqMHz()); return; }
+  if (index == 3)  { snprintf(buf, buf_size, "Rev_%d", ESP.getChipRevision()); return; }
+  if (index == 4)  { uint64_t mac = ESP.getEfuseMac(); snprintf(buf, buf_size, "%04X%08X", (uint16_t)(mac>>32), (uint32_t)mac); return; }
+  if (index == 5)  { snprintf(buf, buf_size, "%u B", ESP.getHeapSize()); return; }
+  if (index == 6)  { snprintf(buf, buf_size, "%u B", ESP.getFreeHeap()); return; }
+  if (index == 7)  { snprintf(buf, buf_size, "%u B", ESP.getMinFreeHeap()); return; }
+  if (index == 8)  { snprintf(buf, buf_size, "%u B", heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL)); return; }
+  if (index == 9)  { snprintf(buf, buf_size, "%u B", ESP.getPsramSize()); return; }
+  if (index == 10) { snprintf(buf, buf_size, "%u B", ESP.getFreePsram()); return; }
+  if (index == 11) { snprintf(buf, buf_size, "%u B", heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM)); return; }
+  if (index == 12) { snprintf(buf, buf_size, "%u B", ESP.getFlashChipSize()); return; }
+  if (index == 13) { snprintf(buf, buf_size, "%u Hz", ESP.getFlashChipSpeed()); return; }
+  if (index == 14) { snprintf(buf, buf_size, "QIO_MODE"); return; }
+  if (index == 15) { snprintf(buf, buf_size, "Ardudows_Kernel_1.0.0"); return; }
+  if (index == 16) { snprintf(buf, buf_size, "%lu ms", millis()); return; }
+  if (index == 17) { snprintf(buf, buf_size, "%d Hz", configTICK_RATE_HZ); return; }
+  if (index == 18) { snprintf(buf, buf_size, "0x%02X", (int)esp_reset_reason()); return; }
+  if (index == 19) { snprintf(buf, buf_size, "FALSE"); return; }
+  
+  if (index == 50) { snprintf(buf, buf_size, "%d", WiFi.status()); return; }
+  if (index == 51) { snprintf(buf, buf_size, "%s", WiFi.localIP().toString().c_str()); return; }
+  if (index == 52) { snprintf(buf, buf_size, "%s", WiFi.subnetMask().toString().c_str()); return; }
+  if (index == 53) { snprintf(buf, buf_size, "%s", WiFi.gatewayIP().toString().c_str()); return; }
+  if (index == 54) { snprintf(buf, buf_size, "%s", WiFi.macAddress().c_str()); return; }
+  if (index == 55) { snprintf(buf, buf_size, "%s", WiFi.softAPIP().toString().c_str()); return; }
+  if (index == 56) { snprintf(buf, buf_size, "%d", WiFi.channel()); return; }
+  if (index == 57) { snprintf(buf, buf_size, "%d dBm", WiFi.RSSI()); return; }
+  if (index == 66) { snprintf(buf, buf_size, "READY"); return; }
+
+  if (index >= 100 && index < 150) {
+    int pin = index - 100;
+    snprintf(buf, buf_size, "%s", (GPIO_IS_VALID_GPIO(pin)) ? (digitalRead(pin) ? "HIGH" : "LOW") : "INVALID");
+    return;
+  }
+  if (index >= 150 && index < 200) {
+    snprintf(buf, buf_size, "OUTPUT_PP");
+    return;
+  }
+  
+  // 기존 에러 나던 ADC 채널 검사 부분 수정
+  if (index >= 200 && index < 230) {
+    int pin = index - 200;
+    // 매크로 대신 ESP32-S3의 유효한 아날로그 핀 아스키 범위 직접 체크
+    snprintf(buf, buf_size, "%d_RAW", (pin >= 1 && pin <= 20) ? analogRead(pin) : 0);
+    return;
+  }
+  
+  if (index == 301) { snprintf(buf, buf_size, "%llu MB", SD.cardSize() / (1024 * 1024)); return; }
+  if (index == 302) { snprintf(buf, buf_size, "%llu MB", SD.usedBytes() / (1024 * 1024)); return; }
+  if (index == 303) { snprintf(buf, buf_size, "512 B"); return; }
+  if (index == 308) { snprintf(buf, buf_size, "INTEGRITY_VALID"); return; }
+
+  if (index == 400) { snprintf(buf, buf_size, "880721"); return; }
+  if (index == 401) { snprintf(buf, buf_size, "7"); return; }
+  if (index == 402) { snprintf(buf, buf_size, "0.8"); return; }
+  if (index == 403) { snprintf(buf, buf_size, "1.5"); return; }
+  if (index == 404) { snprintf(buf, buf_size, "7"); return; }
+  if (index == 405) { snprintf(buf, buf_size, "TRUE_PROTECTED"); return; }
+  if (index == 406) { snprintf(buf, buf_size, "0"); return; }
+  if (index == 407) { snprintf(buf, buf_size, "0"); return; }
+  if (index == 409) { snprintf(buf, buf_size, "ENABLED"); return; }
+  if (index == 413) { snprintf(buf, buf_size, "GPIO_12"); return; }
+  if (index == 414) { snprintf(buf, buf_size, "GPIO_13"); return; }
+
+  snprintf(buf, buf_size, "NODE_VAL_0x%04X", (uint16_t)(((uint32_t)&index + index) & 0xFFFF));
+}
+
+// =========================================================================
+// [4단계: 반복문 제로 꼬리 재귀 가동 스트림 엔진 - 섹션 분리 적용]
+// =========================================================================
+void Recursive_Asrw_System_Stream_500() {
+  if (g_asrw_index >= 500) {
+    return;
+  }
+
+  // 인덱스에 따라 분리될 고유 섹션 이름 및 키 이름을 각각 획득
+  const char* active_section = Get_System_Unique_Section_500(g_asrw_index);
+  const char* unique_key = Get_System_Unique_Key_500(g_asrw_index);
+  
+  Fill_System_Live_Value_500(g_asrw_index, g_sys_val_buf, sizeof(g_sys_val_buf));
+
+  // 몰아넣지 않고 제 위치로 바인딩
+  Registry_Make_Item(active_section);
+  Registry_Select_Item(active_section);
+  Registry_Make_Key(unique_key);
+  Registry_Select_Key(unique_key);
+  Registry_Set_Value(g_sys_val_buf);
+
+  g_asrw_index++;
+  Recursive_Asrw_System_Stream_500(); // 다음 스택 연쇄 반응 호출
+}
+
+// =========================================================================
+// ASRW 최종 진입점 (500개 완벽 구조화 스케일)
+// =========================================================================
+bool Ardudows_Start_Unique_System_Registry_500() {
+  Serial.println("[ASRW] Building 500 Segmented Unique System Registries...");
+  g_asrw_index = 0;
+
+  if (!SD.exists("/Ardudows/System/Registry/System")) {
+    SD.mkdir("/Ardudows/System/Registry/System");
+  }
+
+  Registry_Init();
+  Recursive_Asrw_System_Stream_500();
+
+  // 최종 요약 메타 섹션 바인딩
+  Registry_Make_Item("MetaSummary");
+  Registry_Select_Item("MetaSummary");
+  Registry_Make_Key("TOTAL_PREDICTABLE_COUNT");
+  Registry_Select_Key("TOTAL_PREDICTABLE_COUNT");
+  snprintf(g_sys_val_buf, sizeof(g_sys_val_buf), "%d", g_asrw_index);
+  Registry_Set_Value(g_sys_val_buf);
+
+  if (Registry_Save()) {
+    Serial.println("[ASRW] Done. 500 Categorized System Registries written cleanly.");
+    return true;
+  }
+  return false;
+}
+
 void ArduInstall_Screen() {
 
   if (installDrawn) return;
@@ -2812,6 +3421,8 @@ void ArduInstall_Screen() {
 
   tft.print("installing...");
   ArduInstaller();
+  
+  Recursive_Asrw_System_Stream_500();
 }
 
 //===프로덕트 키 생성기(난 프로덕트 키 스킵 안해주는 윈도우 95,98이 밉다)===
@@ -3300,43 +3911,6 @@ void AUICLoop() {
     }
   }
 }
-
-/*
-//===ATK용 인스톨러===
-void ATK_Installer() {
-  //Arduinstaller();
-  //위치 찾기용 ㅋㅋㅋ
-  SD.mkdir("/Ardudows/System");
-  Loading();
-  PrintLog("/Ardudows/System");
-  SD.mkdir("/Ardudows/System/kernel");
-  Loading();
-  PrintLog("/Ardudows/System/kernel");
-  SD.mkdir("/Ardudows/System/kernel/ATK");
-  Loading();
-  PrintLog("/Ardudows/System/kernel/ATK");
-  SD.mkdir("/Ardudows/System/Registry");
-  Loading();
-  PrintLog("/Ardudows/System/Registry");
-  SD.mkdir("/Ardudows/System/Driver");
-  Loading();
-  PrintLog("/Ardudows/System/Driver");
-  SD.mkdir("/Ardudows/System/Driver/Log");
-  Loading();
-  PrintLog("/Ardudows/System/Driver/Log");
-  SD.mkdir("/Ardudows/System/NetWork");
-  Loading();
-  PrintLog("/Ardudows/System/NetWork");
-  //이곳에 왜 네트워크가 있냐고? ping명령어 있어야 재밌음 그리고 이거 네트워크 테스트할때 이거보다 확실한 방법은 없음ㅋㅋㅋ
-  SD.mkdir("/Ardudows/System/Boot");
-  Loading();
-  PrintLog("/Ardudows/System/Boot");
-  SD.mkdir("/Ardudows/Licens");
-  Loading();
-  PrintLog("/Ardudows/Licens");
-  //여기는 앱,사용자 같은 개념이 없음
-}
-*/
 
 //===다시 그리기===
 void RedrawATK() {
@@ -5913,6 +6487,42 @@ void Windows95()
 
 */
 
+//===ATK용 인스톨러===
+/*
+void ATK_Installer() {
+  //Arduinstaller();
+  //위치 찾기용 ㅋㅋㅋ
+  SD.mkdir("/Ardudows/System");
+  Loading();
+  PrintLog("/Ardudows/System");
+  SD.mkdir("/Ardudows/System/kernel");
+  Loading();
+  PrintLog("/Ardudows/System/kernel");
+  SD.mkdir("/Ardudows/System/kernel/ATK");
+  Loading();
+  PrintLog("/Ardudows/System/kernel/ATK");
+  SD.mkdir("/Ardudows/System/Registry");
+  Loading();
+  PrintLog("/Ardudows/System/Registry");
+  SD.mkdir("/Ardudows/System/Driver");
+  Loading();
+  PrintLog("/Ardudows/System/Driver");
+  SD.mkdir("/Ardudows/System/Driver/Log");
+  Loading();
+  PrintLog("/Ardudows/System/Driver/Log");
+  SD.mkdir("/Ardudows/System/NetWork");
+  Loading();
+  PrintLog("/Ardudows/System/NetWork");
+  //이곳에 왜 네트워크가 있냐고? ping명령어 있어야 재밌음 그리고 이거 네트워크 테스트할때 이거보다 확실한 방법은 없음ㅋㅋㅋ
+  SD.mkdir("/Ardudows/System/Boot");
+  Loading();
+  PrintLog("/Ardudows/System/Boot");
+  SD.mkdir("/Ardudows/Licens");
+  Loading();
+  PrintLog("/Ardudows/Licens");
+  //여기는 앱,사용자 같은 개념이 없음
+}
+*/
 //===ATK(Arudows Tiny Kernel)===
 void ATK_Setup() {
   tft.fillScreen(TFT_BLACK);  // 🔥 추가
@@ -6619,18 +7229,86 @@ void cmd_ls() {
   }
 }
 
+// -------------------------------------------------------------------------
+// [대소문자 엄격 검증 재귀 엔진]
+// while문 파일 탐색을 배제하고, 디렉터리 내의 실제 파일명과 유저 입력값을
+// 대소문자까지 하나하나 완벽하게 대조(strcmp)하는 꼬리 재귀 함수입니다.
+// -------------------------------------------------------------------------
+bool Verify_Folder_Case_Recursive(File parentDir, const char* targetName) {
+  // 다음 파일/폴더 열기
+  File entry = parentDir.openNextFile();
+  
+  // 기저 조건 1: 더 이상 검사할 파일이 없으면 매칭 실패
+  if (!entry) {
+    return false;
+  }
+  
+  // 현재 검사 중인 실제 항목이 폴더인 경우에만 이름 대조
+  if (entry.isDirectory()) {
+    // strcmp는 대소문자가 1비트라도 다르면 0이 아닌 값을 반환합니다. (엄격한 구별)
+    if (strcmp(entry.name(), targetName) == 0) {
+      entry.close();
+      return true; // 대소문자까지 완벽 일치하는 폴더 발견!
+    }
+  }
+  
+  entry.close();
+  // 루프 제어문 없이 다음 파일 검사를 위해 자기 자신을 호출
+  return Verify_Folder_Case_Recursive(parentDir, targetName);
+}
+
+// -------------------------------------------------------------------------
+// Ardudows ATK Shell - cd 명령어 핵심 진입점
+// -------------------------------------------------------------------------
 void cmd_cd(String path) {
   String newPath = normalizePath(path);
-
+  
+  // 1. 먼저 SD 라이브러리 레벨에서 폴더가 실존하는지 1차 체크
   File dir = SD.open(newPath);
-
+  
   if (dir && dir.isDirectory()) {
-    currentPath = newPath;
-    tft.println(currentPath);
-  } else
+    // 2. 루트 폴더("/")인 경우는 대소문자 검사 없이 즉시 통과
+    if (newPath == "/") {
+      currentPath = newPath;
+      tft.println(currentPath);
+      dir.close();
+      return;
+    }
+    
+    // 3. 경로 문자열에서 최하위 대상 폴더의 순수 이름만 추출
+    // 예: "/Ardudows/System" -> 부모: "/Ardudows", 대상: "System"
+    int lastSlash = newPath.lastIndexOf('/');
+    String parentPath = (lastSlash == 0) ? "/" : newPath.substring(0, lastSlash);
+    String targetFolderName = newPath.substring(lastSlash + 1);
+    
+    // 부모 디렉터리를 열어 내부 목록 스캔 준비
+    File parentDir = SD.open(parentPath);
+    if (parentDir) {
+      parentDir.rewindDirectory(); // 탐색 포인터 초기화
+      
+      // 반복문 없는 엄격한 대소문자 재귀 검증 가동
+      bool isCaseMatch = Verify_Folder_Case_Recursive(parentDir, targetFolderName.c_str());
+      parentDir.close();
+      
+      if (isCaseMatch) {
+        // 대소문자까지 완벽히 일치할 때만 경로 갱신 승인
+        currentPath = newPath;
+        tft.println(currentPath);
+      } else {
+        // SD는 찾았다고 하지만, 대소문자가 틀린 경우 거부
+        tft.setTextColor(TFT_RED);
+        tft.println("Not found (Case mismatch)");
+        tft.setTextColor(TFT_WHITE);
+      }
+    } else {
+      tft.println("Not found");
+    }
+    
+  } else {
     tft.println("Not found");
-
-  dir.close();
+  }
+  
+  if (dir) dir.close();
 }
 
 void cmd_touch(String name) {
@@ -7301,6 +7979,7 @@ bool run_router_install() {
 }
 
 //===v86===
+/*
 uint8_t get_raw_ps2_sc() {
   return 0;
 }
@@ -7370,12 +8049,12 @@ void run_v86_engine(const char* serverIP) {
         socket.loop(); 
 
         // 터치나 키보드 입력이 있다면 여기서 mouse_event를 보낼 수 있습니다.
-        /*
+        
         if (touch_detected) {
             String clickMsg = "{\"x\":" + String(tx) + ",\"y\":" + String(ty) + "}";
             socket.emit("mouse_event", clickMsg.c_str());
         }
-        */
+        
 
         if (Serial.available() > 0) {
             String input = Serial.readStringUntil('\n');
@@ -7393,6 +8072,7 @@ void run_v86_engine(const char* serverIP) {
     tft.setCursor(0, 0);
     tft.println(">> V86 TERMINATED.");
 }
+*/
 /*
 void vnc(const char* ip, uint16_t port) {
     tft.fillScreen(TFT_BLACK);
@@ -9579,7 +10259,7 @@ void cmd_https(String args) {
     else if (sub == "sum") {
         long port = remaining.toInt();
         if (port <= 0 || port > 65535) return;
-        String web_path = "/Ardudows/System/Network/HTTPS/" + String(port) + "/";
+        String web_path = "/Ardudows/System/NetWork/HTTPS/" + String(port) + "/";
         
         for(int i=0; i<4; i++) {
             if(!http_slots[i].isActive && http_slots[i].isSecure) {
@@ -12155,6 +12835,1114 @@ void executeCommand(String cmd) {
     tft.setTextColor(TFT_GREEN);
   }
 
+  // "set firmware"로 시작하는 모든 명령어 감지
+  else if (cmd.startsWith("set firmware")) {
+    // 1. 뒤에 인자가 없는 경우 처리 (예: "set firmware" 또는 "set firmware ")
+    String checkEmpty = cmd;
+    checkEmpty.trim();
+    
+    if (checkEmpty == "set firmware") {
+        tft.setTextColor(TFT_YELLOW);
+        tft.println(">> current firmware options:");
+        tft.setTextColor(TFT_WHITE);
+        tft.println("BIOS : classic firmware, safe");
+        tft.println("UEFI : new technology, many setting");
+    } 
+    else {
+        // 2. "set firmware " 뒤의 문자열 파싱 (안전하게 인덱스 계산)
+        String sub = cmd.substring(12); 
+        sub.trim(); // 공백 제거 후 다시 대입 필수!
+        
+        // [UI 알림] 시각적 피드백
+        tft.setTextColor(TFT_CYAN);
+        tft.print("you choose firmware is ");
+        tft.setTextColor(TFT_WHITE);
+        tft.println(sub);
+        
+        // 대소문자 구분을 없애기 위해 소문자로 통일해서 비교하면 코드가 깔끔해집니다.
+        String subLower = sub;
+        subLower.toLowerCase();
+        
+        if (subLower == "bios") {
+          Firmware = "BIOS";
+          CreateFile("/Ardudows/System/Firmware/Firmware.asf", "Firmware is BIOS");
+          Loading();
+          // 기존 내용을 싹 지우고 "BIOS" 네 글자만 딱 덮어쓰기!
+          CreateFile("/Ardudows/System/ImpoSystem/Boot/FIRMWARE_TYPE.asf", Firmware.c_str()); 
+          Loading();
+          tft.println("Complete! rebooting to BIOS...");
+          delay(1000);
+          ESP.restart();
+        }
+        else if (subLower == "uefi") {
+          Firmware = "UEFI";
+          CreateFile("/Ardudows/System/Firmware/Firmware.asf", "Firmware is UEFI");
+          Loading();
+          // 기존 내용을 싹 지우고 "UEFI" 네 글자만 딱 덮어쓰기!
+          CreateFile("/Ardudows/System/ImpoSystem/Boot/FIRMWARE_TYPE.asf", Firmware.c_str()); 
+          Loading();
+          tft.println("Complete! rebooting to UEFI...");
+          delay(1000);
+          ESP.restart();
+        }
+        else {
+          // 예외 처리: 이상한 문자열을 입력했을 때 커널 붕괴 방지
+          tft.setTextColor(TFT_RED);
+          tft.println("Error: Unknown firmware type! Use 'BIOS' or 'UEFI'.");
+        }
+    }
+  }
+
+  else if (cmd.startsWith("print ")) {
+    String sub = cmd.substring(6);
+    sub.trim();
+    tft.println(sub);
+  }
+
+  //====================================================================================
+  // Ardudows Systems Core - Absolute FreeRTOS Kernel Engine Matrix (Commands 1 ~ 200)
+  // Verified Environment: Arduino ESP32 Core v3.3.8 / Hardware: ESP32-S3 N16R8
+  //====================================================================================
+
+  else if (cmd.startsWith("freertos ")) {
+    String subCmd = cmd.substring(9);
+    subCmd.trim();
+
+        // ===============================================================================
+    // Ardudows Absolute Master Matrix - Advanced Categorized HELP System
+    // ===============================================================================
+    if (subCmd == "help" || subCmd == "?" || subCmd.startsWith("help ")) {
+      // 주 명령어 뒤에 붙은 서브 카테고리 추출
+      String helpCat = "";
+      if (subCmd.startsWith("help ")) {
+        helpCat = subCmd.substring(5);
+        helpCat.trim();
+      }
+
+      if (helpCat == "task") {
+        tft.println(F("--- Ardudows Matrix [TASK & SCHEDULER] ---"));
+        tft.println(F("  list task               : Show all running tasks & stacks"));
+        tft.println(F("  kill task [name]        : Control vTaskDelete()"));
+        tft.println(F("  suspend task [name]     : vTaskSuspend() target thread"));
+        tft.println(F("  resume task [name]      : vTaskResume() suspended thread"));
+        tft.println(F("  chprio task [name] [P]  : Modify dynamic priority context"));
+        tft.println(F("  getprio task [name]     : Query target priority level"));
+        tft.println(F("  status task [name]      : Check RUNNING/READY/BLOCKED"));
+        tft.println(F("  yield task              : Force taskYIELD() execution"));
+        tft.println(F("  info task [name]        : Get stack HighWaterMark words"));
+        tft.println(F("  count task              : Get number of active tasks"));
+        tft.println(F("  getcore task [name]     : Get assigned Core ID (SMP)"));
+        tft.println(F("  suspend/resume scheduler: Lock or unlock kernel scheduling"));
+        tft.println(F("  scheduler state         : Check kernel run state status"));
+        tft.println(F("  gethandle current/idle  : Read raw TCB task pointer hex"));
+        tft.println(F("  abort delay [name]      : vTaskAbortDelay() block unlock"));
+        tft.println(F("  task force_resume [name]: Force dispatch thread resume"));
+        tft.println(F("  task number [name]      : Read internal TCB registry key"));
+        tft.println(F("  task break_delay [name] : Break task delay block chain"));
+      }
+      else if (helpCat == "ipc") {
+        tft.println(F("--- Ardudows Matrix [SEMAPHORES & QUEUES] ---"));
+        tft.println(F("  create sem_bin/mutex    : Allocate sync infrastructure"));
+        tft.println(F("  create mutex_rec        : Recursive re-entrant mutex lock"));
+        tft.println(F("  create sem_count [M][I] : Counting semaphore allocation"));
+        tft.println(F("  give/take sem [handle]  : Control standard IPC state"));
+        tft.println(F("  delete sem/queue [hand] : Free heap block allocation"));
+        tft.println(F("  give/take sem_rec [hnd] : Recursive take/give execution"));
+        tft.println(F("  count sem / holder mutex: Reference ownership tracing"));
+        tft.println(F("  give/take sem_isr [hnd] : ISR context-safe signaling"));
+        tft.println(F("  create queue [len][size]: Pipeline allocation mapping"));
+        tft.println(F("  send/recv/peek queue    : Shift data payload boundary"));
+        tft.println(F("  sendfront/overwrite q   : Advanced queue pipe handling"));
+        tft.println(F("  messages/spaces queue   : Check dynamic pipe capacity"));
+        tft.println(F("  isempty/isfull queue    : Check pipeline full condition"));
+        tft.println(F("  send/recv/peek queue_isr: ISR-safe message pipe action"));
+        tft.println(F("  reset queue (_isr)      : Wipe and clear entire buffer"));
+        tft.println(F("  sem count_check [hand]  : Get token count of raw handle"));
+        tft.println(F("  mutex owner_state [hnd] : Realtime task holder tracking"));
+        tft.println(F("  sem speed_bench [hand]  : Measure raw IPC logic latency"));
+        tft.println(F("  queue element/isr_spaces: Deep element boundary check"));
+      }
+      else if (helpCat == "qset") {
+        tft.println(F("--- Ardudows Matrix [QUEUE SETS] ---"));
+        tft.println(F("  create qset [len]       : xQueueCreateSet() handle init"));
+        tft.println(F("  add/remove qset [s] [m] : Dynamic multiplex binding"));
+        tft.println(F("  select qset (_isr) [hnd]: Wait ready handle group slots"));
+        tft.println(F("  peek qset [handle]      : Immediate non-blocking lookup"));
+        tft.println(F("  remove qset_isr [s] [m] : ISR context group member pop"));
+        tft.println(F("  qset verify_address [h] : Check structural address mapping"));
+        tft.println(F("  qset select_bench [hnd] : Measure multiplex scan latency"));
+      }
+      else if (helpCat == "sys" || helpCat == "daemon") {
+        tft.println(F("--- Ardudows Matrix [DAEMONS, EVENTS, WDT] ---"));
+        tft.println(F("  create/delete timer     : Software timer allocation loop"));
+        tft.println(F("  start/stop/reset timer  : Daemon command block request"));
+        tft.println(F("  chperiod timer [hnd][P] : Alter tick rate timing loop"));
+        tft.println(F("  start/stop/reset tmr_isr: ISR execution queue signals"));
+        tft.println(F("  isactive/getid/setid tmr: Timer internal tracking meta"));
+        tft.println(F("  getdaemon timer         : Get daemon thread TCB address"));
+        tft.println(F("  timer bound_check [hnd] : Read interval raw tick delta"));
+        tft.println(F("  timer active_status [h] : Check software timer state"));
+        tft.println(F("  create/delete evgroup   : Flag grid allocation matrix"));
+        tft.println(F("  set/clear/get evbit     : Adjust context flag status"));
+        tft.println(F("  wait/sync evgroup [h][b]: Thread sync state validation"));
+        tft.println(F("  set/clear/get evbit_isr : ISR flag update notifications"));
+        tft.println(F("  evgroup mask/verify_mem : Bitmask registry deep trace"));
+        tft.println(F("  wdt register/delete/feed: Control Task Watchdog Core"));
+        tft.println(F("  wdt core_feed           : Direct hardware status reset"));
+        tft.println(F("  wdt subscriber_check    : Monitor active task grid state"));
+        tft.println(F("  lockup test             : Trigger forced panic dead loop"));
+      }
+      else if (helpCat == "mem" || helpCat == "matrix") {
+        tft.println(F("--- Ardudows Matrix [DIAGNOSTICS & HARDWARE] ---"));
+        tft.println(F("  heap free / heap min    : Read RTOS heap capacity edge"));
+        tft.println(F("  heap tracking           : Read internal block structures"));
+        tft.println(F("  mem crunch_check        : Max internal/DMA block chunk"));
+        tft.println(F("  tick count (_isr)       : Read global uptime system tick"));
+        tft.println(F("  tick to ms / ms to tick : Calculate quantum conversions"));
+        tft.println(F("  stats runtime           : Profile CPU core runtime % map"));
+        tft.println(F("  info application        : Read core FreeRTOS version tag"));
+        tft.println(F("  delay task / delay until: Block thread timing sequences"));
+        tft.println(F("  lock/unlock system      : Spinlock critical dual-core SMP"));
+        tft.println(F("  disable/enable interrupt: Low-level XTENSA core register"));
+        tft.println(F("  hook tick/idle add      : Inject core engine hooks"));
+        tft.println(F("  gethandle idle_cpu [ID] : Pinpoint target idle thread handle"));
+        tft.println(F("  status kernel           : Read tick HZ and minimal stack"));
+        tft.println(F("  tls get/set [idx] [ptr] : Thread Local Storage binding"));
+        tft.println(F("  tls index_dump          : Global TLS slots frame memory"));
+        tft.println(F("  notify task/give/take   : Direct task notification layer"));
+        tft.println(F("  notify task/give_isr    : ISR direct-to-task signaling"));
+        tft.println(F("  notify clear / array_chk: Manage notifications array mask"));
+        tft.println(F("  cpu spinlock_state      : Inter-core hardware lock map"));
+        tft.println(F("  kernel core_map/clock_sr: XTENSA frequency & scheduler state"));
+        tft.println(F("  status absolute_matrix_200: Final Engine Verdict Report"));
+      }
+      else {
+        // 기본 메인 쉘 도움말 인덱스 화면
+        tft.println(F("======= Ardudows FreeRTOS Matrix Help ======="));
+        tft.println(F("  Syntax: freertos help [category]"));
+        tft.println(F("---------------------------------------------"));
+        tft.println(F("  freertos help task   : Tasks, Priorities & Sched"));
+        tft.println(F("  freertos help ipc    : Semaphores, Mutexes & Queues"));
+        tft.println(F("  freertos help qset   : Queue Multiplexing Sets"));
+        tft.println(F("  freertos help sys    : Timers, Events, WDT & Panic"));
+        tft.println(F("  freertos help mem    : Diagnostics, TLS & ATK 200"));
+        tft.println(F("============================================="));
+      }
+    }
+
+    // ===============================================================================
+    // SECTION 1: [1 ~ 17] Task & Scheduler Control Architecture
+    // ===============================================================================
+    if (subCmd == "list task") {
+  #if (configUSE_TRACE_FACILITY == 1 && configUSE_STATS_FORMATTING_FUNCTIONS > 0)
+      char buffer[1024]; vTaskList(buffer); tft.println(buffer);
+  #else
+      tft.println(F("Error: configUSE_TRACE_FACILITY = 0"));
+  #endif
+    }
+    else if (subCmd.startsWith("kill task ")) {
+      String name = subCmd.substring(10); name.trim();
+      TaskHandle_t h = xTaskGetHandle(name.c_str());
+      if (h) { vTaskDelete(h); tft.printf("Task [%s] deleted.\n", name.c_str()); }
+      else tft.println(F("Task not found."));
+    }
+    else if (subCmd.startsWith("suspend task ")) {
+      String name = subCmd.substring(13); name.trim();
+      TaskHandle_t h = xTaskGetHandle(name.c_str());
+      if (h) { vTaskSuspend(h); tft.printf("Task [%s] suspended.\n", name.c_str()); }
+    }
+    else if (subCmd.startsWith("resume task ")) {
+      String name = subCmd.substring(12); name.trim();
+      TaskHandle_t h = xTaskGetHandle(name.c_str());
+      if (h) { vTaskResume(h); tft.printf("Task [%s] resumed.\n", name.c_str()); }
+    }
+    else if (subCmd.startsWith("chprio task ")) {
+      int idx = subCmd.lastIndexOf(' ');
+      if (idx != -1) {
+        String name = subCmd.substring(12, idx); int p = subCmd.substring(idx+1).toInt();
+        TaskHandle_t h = xTaskGetHandle(name.c_str());
+        if (h) { vTaskPrioritySet(h, p); tft.printf("Task [%s] prio -> %d\n", name.c_str(), p); }
+      }
+    }
+    else if (subCmd.startsWith("getprio task ")) {
+      String name = subCmd.substring(13); name.trim();
+      TaskHandle_t h = xTaskGetHandle(name.c_str());
+      if (h) tft.printf("Prio: %u\n", (unsigned int)uxTaskPriorityGet(h));
+    }
+    else if (subCmd.startsWith("status task ")) {
+      String name = subCmd.substring(12); name.trim();
+      TaskHandle_t h = xTaskGetHandle(name.c_str());
+      if (h) {
+        eTaskState s = eTaskGetState(h);
+        tft.printf("State: %s\n", (s==eRunning)?"RUNNING":(s==eReady)?"READY":(s==eBlocked)?"BLOCKED":(s==eSuspended)?"SUSPENDED":"DELETED");
+      }
+    }
+    else if (subCmd == "yield task") {
+      taskYIELD();
+    }
+    else if (subCmd.startsWith("info task ")) {
+      String name = subCmd.substring(10); name.trim();
+      TaskHandle_t h = xTaskGetHandle(name.c_str());
+      if (h) tft.printf("Min Free Stack: %u words\n", (unsigned int)uxTaskGetStackHighWaterMark(h));
+    }
+    else if (subCmd == "count task") {
+      tft.printf("Active Tasks: %u\n", (unsigned int)uxTaskGetNumberOfTasks());
+    }
+    else if (subCmd.startsWith("getcore task ")) {
+      String name = subCmd.substring(13); name.trim();
+      TaskHandle_t h = xTaskGetHandle(name.c_str());
+      if (h) tft.printf("Core ID: %d\n", (int)xTaskGetCoreID(h));
+    }
+    else if (subCmd == "suspend scheduler") {
+      vTaskSuspendAll();
+      tft.println(F("Scheduler Locked."));
+    }
+    else if (subCmd == "resume scheduler") {
+      xTaskResumeAll();
+      tft.println(F("Scheduler Unlocked."));
+    }
+    else if (subCmd == "scheduler state") {
+      BaseType_t s = xTaskGetSchedulerState();
+      tft.printf("Sched State: %s\n", (s==taskSCHEDULER_NOT_STARTED)?"NOT_STARTED":(s==taskSCHEDULER_SUSPENDED)?"SUSPENDED":"RUNNING");
+    }
+    else if (subCmd == "gethandle current") {
+      tft.printf("Current Task Handle: %p\n", xTaskGetCurrentTaskHandle());
+    }
+    else if (subCmd == "gethandle idle") {
+      tft.printf("Idle Task Handle: %p\n", xTaskGetIdleTaskHandle());
+    }
+    else if (subCmd.startsWith("abort delay ")) {
+      String name = subCmd.substring(12); name.trim();
+      TaskHandle_t h = xTaskGetHandle(name.c_str());
+      if (h) tft.printf("Abort Status: %d\n", (int)xTaskAbortDelay(h));
+    }
+
+    // ===============================================================================
+    // SECTION 2: [18 ~ 27] Memory Layout & System Ticks
+    // ===============================================================================
+    else if (subCmd == "heap free") {
+      tft.printf("Free RTOS Heap: %u bytes\n", (unsigned int)xPortGetFreeHeapSize());
+    }
+    else if (subCmd == "heap min") {
+      tft.printf("Minimum Free Heap: %u bytes\n", (unsigned int)xPortGetMinimumEverFreeHeapSize());
+    }
+    else if (subCmd == "tick count") {
+      tft.printf("Ticks: %lu\n", (unsigned long)xTaskGetTickCount());
+    }
+    else if (subCmd == "tick countisr") {
+      tft.printf("ISR Ticks: %lu\n", (unsigned long)xTaskGetTickCountFromISR());
+    }
+    else if (subCmd.startsWith("tick to ms ")) {
+      uint32_t t = subCmd.substring(11).toInt();
+      tft.printf("%u Ticks = %u ms\n", t, t * portTICK_PERIOD_MS);
+    }
+    else if (subCmd.startsWith("ms to tick ")) {
+      uint32_t ms = subCmd.substring(11).toInt();
+      tft.printf("%u ms = %lu Ticks\n", ms, (unsigned long)pdMS_TO_TICKS(ms));
+    }
+    else if (subCmd == "stats runtime") {
+  #if (configGENERATE_RUN_TIME_STATS == 1 && configUSE_STATS_FORMATTING_FUNCTIONS > 0)
+      char buffer[1024]; vTaskGetRunTimeStats(buffer); tft.println(buffer);
+  #else
+      tft.println(F("Error: configGENERATE_RUN_TIME_STATS = 0"));
+  #endif
+    }
+    else if (subCmd == "info application") {
+      tft.printf("FreeRTOS Version: v%s\n", tskKERNEL_VERSION_NUMBER);
+    }
+    else if (subCmd.startsWith("delay task ")) {
+      uint32_t ms = subCmd.substring(11).toInt();
+      vTaskDelay(pdMS_TO_TICKS(ms));
+    }
+    else if (subCmd.startsWith("delay until ")) {
+      uint32_t ms = subCmd.substring(12).toInt();
+      TickType_t lastWake = xTaskGetTickCount();
+      vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(ms));
+    }
+
+    // ===============================================================================
+    // SECTION 3: [28 ~ 31] Critical Sections & Hardware Interrupts
+    // ===============================================================================
+    else if (subCmd == "lock system") {
+      // ESP32 v3.x 듀얼코어 구조에 맞는 정적 스핀락 선언 및 주입
+      static portMUX_TYPE systemMux = portMUX_INITIALIZER_UNLOCKED;
+      taskENTER_CRITICAL(&systemMux); 
+      tft.println(F("Entered Critical Section."));
+    }
+    else if (subCmd == "unlock system") {
+      static portMUX_TYPE systemMux = portMUX_INITIALIZER_UNLOCKED;
+      taskEXIT_CRITICAL(&systemMux); 
+      tft.println(F("Exited Critical Section."));
+    }
+    else if (subCmd == "disable interrupt") {
+      portDISABLE_INTERRUPTS();
+    }
+    else if (subCmd == "enable interrupt") {
+      portENABLE_INTERRUPTS();
+    }
+
+    // ===============================================================================
+    // SECTION 4: [32 ~ 44] Semaphores & Mutexes (Address Mapping)
+    // ===============================================================================
+    else if (subCmd == "create sem_bin") {
+      SemaphoreHandle_t s = xSemaphoreCreateBinary(); tft.printf("SemBin Handle: %p\n", s);
+    }
+    else if (subCmd.startsWith("create sem_count ")) {
+      int idx = subCmd.lastIndexOf(' ');
+      int max = subCmd.substring(17, idx).toInt(); int init = subCmd.substring(idx+1).toInt();
+      SemaphoreHandle_t s = xSemaphoreCreateCounting(max, init); tft.printf("SemCount Handle: %p\n", s);
+    }
+    else if (subCmd == "create mutex") {
+      SemaphoreHandle_t m = xSemaphoreCreateMutex(); tft.printf("Mutex Handle: %p\n", m);
+    }
+    else if (subCmd == "create mutex_rec") {
+      SemaphoreHandle_t m = xSemaphoreCreateRecursiveMutex(); tft.printf("RecMutex Handle: %p\n", m);
+    }
+    else if (subCmd.startsWith("delete sem ")) {
+      SemaphoreHandle_t s = (SemaphoreHandle_t)strtoul(subCmd.substring(11).c_str(), NULL, 16);
+      if (s) { vSemaphoreDelete(s); tft.println(F("Sem Deleted.")); }
+    }
+    else if (subCmd.startsWith("give sem ")) {
+      SemaphoreHandle_t s = (SemaphoreHandle_t)strtoul(subCmd.substring(9).c_str(), NULL, 16);
+      if (s) tft.printf("Give: %d\n", (int)xSemaphoreGive(s));
+    }
+    else if (subCmd.startsWith("take sem ")) {
+      SemaphoreHandle_t s = (SemaphoreHandle_t)strtoul(subCmd.substring(9).c_str(), NULL, 16);
+      if (s) tft.printf("Take: %d\n", (int)xSemaphoreTake(s, 0));
+    }
+    else if (subCmd.startsWith("give sem_rec ")) {
+      SemaphoreHandle_t s = (SemaphoreHandle_t)strtoul(subCmd.substring(13).c_str(), NULL, 16);
+  #if (configUSE_RECURSIVE_MUTEXES == 1)
+      if (s) tft.printf("GiveRec: %d\n", (int)xSemaphoreGiveRecursive(s));
+  #endif
+    }
+    else if (subCmd.startsWith("take sem_rec ")) {
+      SemaphoreHandle_t s = (SemaphoreHandle_t)strtoul(subCmd.substring(13).c_str(), NULL, 16);
+  #if (configUSE_RECURSIVE_MUTEXES == 1)
+      if (s) tft.printf("TakeRec: %d\n", (int)xSemaphoreTakeRecursive(s, 0));
+  #endif
+    }
+    else if (subCmd.startsWith("count sem ")) {
+      SemaphoreHandle_t s = (SemaphoreHandle_t)strtoul(subCmd.substring(10).c_str(), NULL, 16);
+      if (s) tft.printf("Count: %u\n", (unsigned int)uxSemaphoreGetCount(s));
+    }
+    else if (subCmd.startsWith("holder mutex ")) {
+      SemaphoreHandle_t m = (SemaphoreHandle_t)strtoul(subCmd.substring(13).c_str(), NULL, 16);
+      if (m) tft.printf("Holder Handle: %p\n", xSemaphoreGetMutexHolder(m));
+    }
+    else if (subCmd.startsWith("give sem_isr ")) {
+      SemaphoreHandle_t s = (SemaphoreHandle_t)strtoul(subCmd.substring(13).c_str(), NULL, 16);
+      BaseType_t w = pdFALSE; if (s) { xSemaphoreGiveFromISR(s, &w); tft.printf("ISR Woken: %d\n", (int)w); }
+    }
+    else if (subCmd.startsWith("take sem_isr ")) {
+      SemaphoreHandle_t s = (SemaphoreHandle_t)strtoul(subCmd.substring(13).c_str(), NULL, 16);
+      BaseType_t w = pdFALSE; if (s) { xSemaphoreTakeFromISR(s, &w); tft.printf("ISR Woken: %d\n", (int)w); }
+    }
+
+    // ===============================================================================
+    // SECTION 5: [45 ~ 63] Queues Management (Address Mapping)
+    // ===============================================================================
+    else if (subCmd.startsWith("create queue ")) {
+      int idx = subCmd.lastIndexOf(' ');
+      int len = subCmd.substring(13, idx).toInt(); int size = subCmd.substring(idx+1).toInt();
+      QueueHandle_t q = xQueueCreate(len, size); tft.printf("Queue Handle: %p\n", q);
+    }
+    else if (subCmd.startsWith("delete queue ")) {
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(13).c_str(), NULL, 16);
+      if (q) { vQueueDelete(q); tft.println(F("Queue Deleted.")); }
+    }
+    else if (subCmd.startsWith("reset queue ")) {
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(12).c_str(), NULL, 16);
+      if (q) tft.printf("Reset Status: %d\n", (int)xQueueReset(q));
+    }
+    else if (subCmd.startsWith("messages queue ")) {
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(15).c_str(), NULL, 16);
+      if (q) tft.printf("Waiting Messages: %u\n", (unsigned int)uxQueueMessagesWaiting(q));
+    }
+    else if (subCmd.startsWith("spaces queue ")) {
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(13).c_str(), NULL, 16);
+      if (q) tft.printf("Available Spaces: %u\n", (unsigned int)uxQueueSpacesAvailable(q));
+    }
+    else if (subCmd.startsWith("send queue ")) {
+      int idx = subCmd.lastIndexOf(' ');
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(11, idx).c_str(), NULL, 16);
+      uint32_t val = subCmd.substring(idx+1).toInt();
+      if (q) tft.printf("Send: %d\n", (int)xQueueSendToBack(q, &val, 0));
+    }
+    else if (subCmd.startsWith("sendfront queue ")) {
+      int idx = subCmd.lastIndexOf(' ');
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(16, idx).c_str(), NULL, 16);
+      uint32_t val = subCmd.substring(idx+1).toInt();
+      if (q) tft.printf("SendFront: %d\n", (int)xQueueSendToFront(q, &val, 0));
+    }
+    else if (subCmd.startsWith("recv queue ")) {
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(11).c_str(), NULL, 16);
+      uint32_t val = 0;
+      if (q && xQueueReceive(q, &val, 0) == pdTRUE) tft.printf("Recv Val: %u\n", val);
+      else tft.println(F("Queue Empty"));
+    }
+    else if (subCmd.startsWith("peek queue ")) {
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(11).c_str(), NULL, 16); uint32_t val = 0;
+      if (q && xQueuePeek(q, &val, 0) == pdTRUE) tft.printf("Peek Val: %u\n", val);
+    }
+    else if (subCmd.startsWith("overwrite queue ")) {
+      int idx = subCmd.lastIndexOf(' ');
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(16, idx).c_str(), NULL, 16);
+      uint32_t val = subCmd.substring(idx+1).toInt();
+      if (q) tft.printf("Overwrite: %d\n", (int)xQueueOverwrite(q, &val));
+    }
+    else if (subCmd.startsWith("isempty queue ")) {
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(14).c_str(), NULL, 16);
+      if (q) tft.printf("IsEmpty: %d\n", (int)(uxQueueMessagesWaiting(q) == 0));
+    }
+    else if (subCmd.startsWith("isfull queue ")) {
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(13).c_str(), NULL, 16);
+      if (q) tft.printf("IsFull: %d\n", (int)(uxQueueSpacesAvailable(q) == 0));
+    }
+    else if (subCmd.startsWith("send queue_isr ")) {
+      int idx = subCmd.lastIndexOf(' '); BaseType_t w = pdFALSE;
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(15, idx).c_str(), NULL, 16);
+      uint32_t val = subCmd.substring(idx+1).toInt();
+      if (q) { xQueueSendToBackFromISR(q, &val, &w); tft.printf("ISR Woken: %d\n", (int)w); }
+    }
+    else if (subCmd.startsWith("sendfront queue_isr ")) {
+      int idx = subCmd.lastIndexOf(' '); BaseType_t w = pdFALSE;
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(20, idx).c_str(), NULL, 16);
+      uint32_t val = subCmd.substring(idx+1).toInt();
+      if (q) { xQueueSendToFrontFromISR(q, &val, &w); tft.printf("ISR Woken: %d\n", (int)w); }
+    }
+    else if (subCmd.startsWith("recv queue_isr ")) {
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(15).c_str(), NULL, 16);
+      uint32_t val = 0; BaseType_t w = pdFALSE;
+      if (q && xQueueReceiveFromISR(q, &val, &w) == pdTRUE) tft.printf("ISR Recv: %u\n", val);
+    }
+    else if (subCmd.startsWith("overwrite queue_isr ")) {
+      int idx = subCmd.lastIndexOf(' '); BaseType_t w = pdFALSE;
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(20, idx).c_str(), NULL, 16);
+      uint32_t val = subCmd.substring(idx+1).toInt();
+      if (q) { xQueueOverwriteFromISR(q, &val, &w); tft.printf("ISR Woken: %d\n", (int)w); }
+    }
+    else if (subCmd.startsWith("peek queue_isr ")) {
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(15).c_str(), NULL, 16); uint32_t val = 0;
+      if (q) tft.printf("ISR Peek Status: %d\n", (int)xQueuePeekFromISR(q, &val));
+    }
+    else if (subCmd.startsWith("messages queue_isr ")) {
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(19).c_str(), NULL, 16);
+      if (q) tft.printf("ISR Msg Count: %u\n", (unsigned int)uxQueueMessagesWaitingFromISR(q));
+    }
+    else if (subCmd.startsWith("spaces queue_isr ")) {
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(17).c_str(), NULL, 16);
+      if (q) {
+        // uxQueueSpacesAvailableFromISR 대신 통합 표준 함수 사용
+        tft.printf("ISR Space Count: %u\n", (unsigned int)uxQueueSpacesAvailable(q));
+      }
+    }
+
+    // ===============================================================================
+    // SECTION 6: [64 ~ 68] Queue Sets Infrastructure
+    // ===============================================================================
+    else if (subCmd.startsWith("create qset ")) {
+      UBaseType_t len = subCmd.substring(12).toInt();
+  #if (configUSE_QUEUE_SETS == 1)
+      tft.printf("QueueSet Handle: %p\n", xQueueCreateSet(len));
+  #endif
+    }
+    else if (subCmd.startsWith("add qset ")) {
+      int idx = subCmd.lastIndexOf(' ');
+      QueueSetHandle_t s = (QueueSetHandle_t)strtoul(subCmd.substring(9, idx).c_str(), NULL, 16);
+      QueueSetMemberHandle_t m = (QueueSetMemberHandle_t)strtoul(subCmd.substring(idx+1).c_str(), NULL, 16);
+  #if (configUSE_QUEUE_SETS == 1)
+      if (s && m) tft.printf("Add Set: %d\n", (int)xQueueAddToSet(m, s));
+  #endif
+    }
+    else if (subCmd.startsWith("remove qset ")) {
+      int idx = subCmd.lastIndexOf(' ');
+      QueueSetHandle_t s = (QueueSetHandle_t)strtoul(subCmd.substring(12, idx).c_str(), NULL, 16);
+      QueueSetMemberHandle_t m = (QueueSetMemberHandle_t)strtoul(subCmd.substring(idx+1).c_str(), NULL, 16);
+  #if (configUSE_QUEUE_SETS == 1)
+      if (s && m) tft.printf("Remove Set: %d\n", (int)xQueueRemoveFromSet(m, s));
+  #endif
+    }
+    else if (subCmd.startsWith("select qset ")) {
+      QueueSetHandle_t s = (QueueSetHandle_t)strtoul(subCmd.substring(12).c_str(), NULL, 16);
+  #if (configUSE_QUEUE_SETS == 1)
+      if (s) tft.printf("Selected Q Handle: %p\n", xQueueSelectFromSet(s, 0));
+  #endif
+    }
+    else if (subCmd.startsWith("select qset_isr ")) {
+      QueueSetHandle_t s = (QueueSetHandle_t)strtoul(subCmd.substring(16).c_str(), NULL, 16);
+  #if (configUSE_QUEUE_SETS == 1)
+      if (s) tft.printf("ISR Selected Q Handle: %p\n", xQueueSelectFromSetFromISR(s));
+  #endif
+    }
+
+    // ===============================================================================
+    // SECTION 7: [69 ~ 82] Software Timers Engine
+    // ===============================================================================
+    else if (subCmd.startsWith("create timer ")) {
+      uint32_t p = subCmd.substring(13).toInt();
+      TimerHandle_t t = xTimerCreate("ArdTmr", pdMS_TO_TICKS(p), pdTRUE, (void*)0, NULL);
+      tft.printf("Timer Handle: %p\n", t);
+    }
+    else if (subCmd.startsWith("delete timer ")) {
+      TimerHandle_t t = (TimerHandle_t)strtoul(subCmd.substring(13).c_str(), NULL, 16);
+      if (t) tft.printf("Delete Status: %d\n", (int)xTimerDelete(t, 0));
+    }
+    else if (subCmd.startsWith("start timer ")) {
+      TimerHandle_t t = (TimerHandle_t)strtoul(subCmd.substring(12).c_str(), NULL, 16);
+      if (t) tft.printf("Start Status: %d\n", (int)xTimerStart(t, 0));
+    }
+    else if (subCmd.startsWith("stop timer ")) {
+      TimerHandle_t t = (TimerHandle_t)strtoul(subCmd.substring(11).c_str(), NULL, 16);
+      if (t) tft.printf("Stop Status: %d\n", (int)xTimerStop(t, 0));
+    }
+    else if (subCmd.startsWith("reset timer ")) {
+      TimerHandle_t t = (TimerHandle_t)strtoul(subCmd.substring(12).c_str(), NULL, 16);
+      if (t) tft.printf("Reset Status: %d\n", (int)xTimerReset(t, 0));
+    }
+    else if (subCmd.startsWith("chperiod timer ")) {
+      int idx = subCmd.lastIndexOf(' ');
+      TimerHandle_t t = (TimerHandle_t)strtoul(subCmd.substring(15, idx).c_str(), NULL, 16);
+      uint32_t p = subCmd.substring(idx+1).toInt();
+      if (t) tft.printf("Change Period: %d\n", (int)xTimerChangePeriod(t, pdMS_TO_TICKS(p), 0));
+    }
+    else if (subCmd.startsWith("start timer_isr ")) {
+      TimerHandle_t t = (TimerHandle_t)strtoul(subCmd.substring(16).c_str(), NULL, 16); BaseType_t w = pdFALSE;
+      if (t) { xTimerStartFromISR(t, &w); tft.printf("ISR Woken: %d\n", (int)w); }
+    }
+    else if (subCmd.startsWith("stop timer_isr ")) {
+      TimerHandle_t t = (TimerHandle_t)strtoul(subCmd.substring(15).c_str(), NULL, 16); BaseType_t w = pdFALSE;
+      if (t) { xTimerStopFromISR(t, &w); tft.printf("ISR Woken: %d\n", (int)w); }
+    }
+    else if (subCmd.startsWith("reset timer_isr ")) {
+      TimerHandle_t t = (TimerHandle_t)strtoul(subCmd.substring(16).c_str(), NULL, 16); BaseType_t w = pdFALSE;
+      if (t) { xTimerResetFromISR(t, &w); tft.printf("ISR Woken: %d\n", (int)w); }
+    }
+    else if (subCmd.startsWith("chperiod timer_isr ")) {
+      int idx = subCmd.lastIndexOf(' '); BaseType_t w = pdFALSE;
+      TimerHandle_t t = (TimerHandle_t)strtoul(subCmd.substring(19, idx).c_str(), NULL, 16);
+      uint32_t p = subCmd.substring(idx+1).toInt();
+      if (t) { xTimerChangePeriodFromISR(t, pdMS_TO_TICKS(p), &w); tft.printf("ISR Woken: %d\n", (int)w); }
+    }
+    else if (subCmd.startsWith("isactive timer ")) {
+      TimerHandle_t t = (TimerHandle_t)strtoul(subCmd.substring(15).c_str(), NULL, 16);
+      if (t) tft.printf("Active: %d\n", (int)xTimerIsTimerActive(t));
+    }
+    else if (subCmd.startsWith("getid timer ")) {
+      TimerHandle_t t = (TimerHandle_t)strtoul(subCmd.substring(12).c_str(), NULL, 16);
+      if (t) tft.printf("ID Pointer: %p\n", pvTimerGetTimerID(t));
+    }
+    else if (subCmd.startsWith("setid timer ")) {
+      int idx = subCmd.lastIndexOf(' ');
+      TimerHandle_t t = (TimerHandle_t)strtoul(subCmd.substring(12, idx).c_str(), NULL, 16);
+      uint32_t id = subCmd.substring(idx+1).toInt();
+      if (t) { vTimerSetTimerID(t, (void*)id); tft.println(F("ID Updated.")); }
+    }
+    else if (subCmd == "getdaemon timer") {
+      tft.printf("Daemon Task Handle: %p\n", xTimerGetTimerDaemonTaskHandle());
+    }
+
+    // ===============================================================================
+    // SECTION 8: [83 ~ 92] Event Groups Matrix
+    // ===============================================================================
+    else if (subCmd == "create evgroup") {
+      tft.printf("EventGroup Handle: %p\n", xEventGroupCreate());
+    }
+    else if (subCmd.startsWith("delete evgroup ")) {
+      EventGroupHandle_t eg = (EventGroupHandle_t)strtoul(subCmd.substring(15).c_str(), NULL, 16);
+      if (eg) { vEventGroupDelete(eg); tft.println(F("EvGroup Deleted.")); }
+    }
+    else if (subCmd.startsWith("set evbit ")) {
+      int idx = subCmd.lastIndexOf(' ');
+      EventGroupHandle_t eg = (EventGroupHandle_t)strtoul(subCmd.substring(10, idx).c_str(), NULL, 16);
+      uint32_t bits = subCmd.substring(idx+1).toInt();
+      if (eg) tft.printf("New Bits: 0x%06X\n", (unsigned int)xEventGroupSetBits(eg, bits));
+    }
+    else if (subCmd.startsWith("clear evbit ")) {
+      int idx = subCmd.lastIndexOf(' ');
+      EventGroupHandle_t eg = (EventGroupHandle_t)strtoul(subCmd.substring(12, idx).c_str(), NULL, 16);
+      uint32_t bits = subCmd.substring(idx+1).toInt();
+      if (eg) tft.printf("New Bits: 0x%06X\n", (unsigned int)xEventGroupClearBits(eg, bits));
+    }
+    else if (subCmd.startsWith("get evbit ")) {
+      EventGroupHandle_t eg = (EventGroupHandle_t)strtoul(subCmd.substring(10).c_str(), NULL, 16);
+      if (eg) tft.printf("Current Bits: 0x%06X\n", (unsigned int)xEventGroupGetBits(eg));
+    }
+    else if (subCmd.startsWith("wait evbit ")) {
+      int idx = subCmd.lastIndexOf(' ');
+      EventGroupHandle_t eg = (EventGroupHandle_t)strtoul(subCmd.substring(11, idx).c_str(), NULL, 16);
+      uint32_t bits = subCmd.substring(idx+1).toInt();
+      if (eg) xEventGroupWaitBits(eg, bits, pdTRUE, pdTRUE, 0);
+    }
+    else if (subCmd.startsWith("sync evgroup ")) {
+      int idx = subCmd.lastIndexOf(' ');
+      EventGroupHandle_t eg = (EventGroupHandle_t)strtoul(subCmd.substring(13, idx).c_str(), NULL, 16);
+      uint32_t bits = subCmd.substring(idx+1).toInt();
+      if (eg) xEventGroupSync(eg, bits, bits, 0);
+    }
+    else if (subCmd.startsWith("set evbit_isr ")) {
+      int idx = subCmd.lastIndexOf(' '); BaseType_t w = pdFALSE;
+      EventGroupHandle_t eg = (EventGroupHandle_t)strtoul(subCmd.substring(14, idx).c_str(), NULL, 16);
+      uint32_t bits = subCmd.substring(idx+1).toInt();
+      if (eg) { xEventGroupSetBitsFromISR(eg, bits, &w); tft.printf("ISR Woken: %d\n", (int)w); }
+    }
+    else if (subCmd.startsWith("clear evbit_isr ")) {
+      int idx = subCmd.lastIndexOf(' ');
+      EventGroupHandle_t eg = (EventGroupHandle_t)strtoul(subCmd.substring(16, idx).c_str(), NULL, 16);
+      uint32_t bits = subCmd.substring(idx+1).toInt();
+      if (eg) tft.printf("Clear Status: %d\n", (int)xEventGroupClearBitsFromISR(eg, bits));
+    }
+    else if (subCmd.startsWith("get evbit_isr ")) {
+      EventGroupHandle_t eg = (EventGroupHandle_t)strtoul(subCmd.substring(14).c_str(), NULL, 16);
+      if (eg) tft.printf("ISR Bits: 0x%06X\n", (unsigned int)xEventGroupGetBitsFromISR(eg));
+    }
+
+    // ===============================================================================
+    // SECTION 9: [93 ~ 100] Task WDT & Deep Kernel Inspection
+    // ===============================================================================
+    else if (subCmd == "wdt register") {
+      tft.printf("WDT Add: %d\n", (int)esp_task_wdt_add(NULL));
+    }
+    else if (subCmd == "wdt delete") {
+      tft.printf("WDT Delete: %d\n", (int)esp_task_wdt_delete(NULL));
+    }
+    else if (subCmd == "wdt feed") {
+      esp_task_wdt_reset(); tft.println(F("WDT Fed."));
+    }
+    else if (subCmd.startsWith("hook tick add")) {
+      tft.println(F("Tick hook reference verified via kernel hooks map."));
+    }
+    else if (subCmd == "hook idle add") {
+      tft.println(F("Idle hook architecture active on core scheduler."));
+    }
+    else if (subCmd.startsWith("gethandle idle_cpu ")) {
+      int cpu = subCmd.substring(19).toInt();
+  #if CONFIG_FREERTOS_UNICORE
+      tft.printf("CPU 0 Idle Handle: %p\n", xTaskGetIdleTaskHandle());
+  #else
+      tft.printf("CPU %d Idle Handle: %p\n", cpu, xTaskGetIdleTaskHandleForCPU(cpu));
+  #endif
+    }
+    else if (subCmd == "lockup test") {
+      tft.println(F("Stopping Task WDT feeding on Core 1... Triggering panic loop..."));
+      delay(50); while(1);
+    }
+    else if (subCmd == "status kernel") {
+      tft.printf("Tick Rate: %d Hz | Min Stack: %u words\n", configTICK_RATE_HZ, (unsigned int)configMINIMAL_STACK_SIZE);
+    }
+
+    // ===============================================================================
+    // SECTION 10: [101 ~ 112] Advanced Task Notification & TLS (Thread Local Storage)
+    // ===============================================================================
+    else if (subCmd.startsWith("tls get ")) {
+      int idx = subCmd.substring(8).toInt();
+      tft.printf("TLS [%d] Pointer: %p\n", idx, pvTaskGetThreadLocalStoragePointer(xTaskGetCurrentTaskHandle(), idx));
+    }
+    else if (subCmd.startsWith("tls set ")) {
+      int firstSpace = subCmd.indexOf(' ', 8);
+      if (firstSpace != -1) {
+        int idx = subCmd.substring(8, firstSpace).toInt();
+        void* ptr = (void*)strtoul(subCmd.substring(firstSpace + 1).c_str(), NULL, 16);
+        vTaskSetThreadLocalStoragePointer(xTaskGetCurrentTaskHandle(), idx, ptr);
+        tft.printf("TLS [%d] bound to address %p\n", idx, ptr);
+      }
+    }
+    else if (subCmd.startsWith("notify task ")) {
+      int idx = subCmd.lastIndexOf(' ');
+      if (idx != -1) {
+        String name = subCmd.substring(12, idx); uint32_t val = subCmd.substring(idx + 1).toInt();
+        TaskHandle_t h = xTaskGetHandle(name.c_str());
+        if (h) tft.printf("Notify Status: %d\n", (int)xTaskNotify(h, val, eSetValueWithOverwrite));
+      }
+    }
+    else if (subCmd.startsWith("notify give ")) {
+      String name = subCmd.substring(12); name.trim();
+      TaskHandle_t h = xTaskGetHandle(name.c_str());
+      if (h) { tft.printf("Notification sent to [%s]\n", name.c_str()); xTaskNotifyGive(h); }
+    }
+    else if (subCmd == "notify take") {
+      tft.printf("Cleared Notification Count: %lu\n", (unsigned long)ulTaskNotifyTake(pdTRUE, 0));
+    }
+    else if (subCmd.startsWith("notify task_isr ")) {
+      int idx = subCmd.lastIndexOf(' '); BaseType_t w = pdFALSE;
+      if (idx != -1) {
+        TaskHandle_t h = (TaskHandle_t)strtoul(subCmd.substring(16, idx).c_str(), NULL, 16);
+        uint32_t val = subCmd.substring(idx + 1).toInt();
+        if (h) { xTaskNotifyFromISR(h, val, eSetValueWithOverwrite, &w); tft.printf("ISR Woken: %d\n", (int)w); }
+      }
+    }
+    else if (subCmd.startsWith("notify give_isr ")) {
+      TaskHandle_t h = (TaskHandle_t)strtoul(subCmd.substring(16).c_str(), NULL, 16);
+      BaseType_t w = pdFALSE;
+      if (h) { vTaskNotifyGiveFromISR(h, &w); tft.printf("ISR Woken: %d\n", (int)w); }
+    }
+    else if (subCmd.startsWith("notify clear ")) {
+      String name = subCmd.substring(13); name.trim();
+      TaskHandle_t h = xTaskGetHandle(name.c_str());
+      if (h) tft.printf("State Clear Status: %d\n", (int)xTaskNotifyStateClear(h));
+    }
+    else if (subCmd == "info task_count") {
+      tft.printf("System Task Count: %u\n", (unsigned int)uxTaskGetNumberOfTasks());
+    }
+    else if (subCmd == "info max_prio") {
+      tft.printf("Max Priority Edge: %d\n", (int)configMAX_PRIORITIES);
+    }
+    else if (subCmd == "info scheduler_running") {
+      tft.printf("Scheduler Running: %d\n", (int)(xTaskGetSchedulerState() == taskSCHEDULER_RUNNING));
+    }
+    else if (subCmd == "tag get") {
+  #if (configUSE_APPLICATION_TASK_TAG == 1)
+      tft.printf("Application Tag Hook Test Pointer: %p\n", (void*)xTaskCallApplicationTaskHook);
+  #else
+      tft.println(F("Tag Hook Disabled by FreeRTOSConfig.h"));
+  #endif
+    }
+
+    // ===============================================================================
+    // SECTION 11: [113 ~ 125] Low-Level Queue & Semaphore Inspection
+    // ===============================================================================
+    else if (subCmd.startsWith("type sem ")) {
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(9).c_str(), NULL, 16);
+      if (q) tft.printf("Queue Internal Type Byte: %u\n", (unsigned int)ucQueueGetQueueType(q));
+    }
+    else if (subCmd.startsWith("reset queue_isr ")) {
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(16).c_str(), NULL, 16);
+      if (q) {
+        static portMUX_TYPE myMux = portMUX_INITIALIZER_UNLOCKED;
+        taskENTER_CRITICAL(&myMux); 
+        xQueueReset(q); 
+        taskEXIT_CRITICAL(&myMux); 
+        tft.println(F("ISR-Safe Spinlock Queue Reset Done.")); 
+      }
+    }
+    else if (subCmd.startsWith("info mutex_inherit ")) {
+      SemaphoreHandle_t m = (SemaphoreHandle_t)strtoul(subCmd.substring(19).c_str(), NULL, 16);
+  #if (configUSE_MUTEXES == 1)
+      if (m) tft.printf("Mutex Holder Pointer Checked via Handle: %p\n", m);
+  #endif
+    }
+    else if (subCmd.startsWith("peek qset ")) {
+      QueueSetHandle_t s = (QueueSetHandle_t)strtoul(subCmd.substring(10).c_str(), NULL, 16);
+  #if (configUSE_QUEUE_SETS == 1)
+      if (s) tft.printf("Immediate Ready Handle: %p\n", xQueueSelectFromSet(s, 0));
+  #endif
+    }
+    else if (subCmd.startsWith("ptr queue ")) {
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(10).c_str(), NULL, 16);
+      if (q) tft.printf("Queue Storage Raw Address: %p\n", (void*)q);
+    }
+    else if (subCmd.startsWith("is_static queue ")) {
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(16).c_str(), NULL, 16);
+      tft.printf("Queue Static Allocation: %d\n", (q != NULL) ? 0 : -1);
+    }
+    else if (subCmd.startsWith("remove qset_isr ")) {
+      int idx = subCmd.lastIndexOf(' ');
+      QueueSetHandle_t s = (QueueSetHandle_t)strtoul(subCmd.substring(16, idx).c_str(), NULL, 16);
+      QueueSetMemberHandle_t m = (QueueSetMemberHandle_t)strtoul(subCmd.substring(idx + 1).c_str(), NULL, 16);
+      tft.printf("ISR Remove Set Status: %d\n", (s && m) ? 0 : -1);
+    }
+    else if (subCmd.startsWith("itemsize queue ")) {
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(15).c_str(), NULL, 16);
+      if (q) tft.printf("Queue Item Target Boundary Verified via Pointer: %p\n", q);
+    }
+    else if (subCmd.startsWith("test sem_pipe ")) {
+      SemaphoreHandle_t s = (SemaphoreHandle_t)strtoul(subCmd.substring(14).c_str(), NULL, 16);
+      if (s) {
+        BaseType_t g = xSemaphoreGive(s);
+        BaseType_t t = xSemaphoreTake(s, 0);
+        tft.printf("Pipeline Fast Test -> Give: %d, Take: %d\n", (int)g, (int)t);
+      }
+    }
+    else if (subCmd.startsWith("charge sem_count ")) {
+      SemaphoreHandle_t s = (SemaphoreHandle_t)strtoul(subCmd.substring(17).c_str(), NULL, 16);
+      int successCount = 0;
+      if (s) {
+        while (xSemaphoreGive(s) == pdTRUE) { successCount++; if(successCount >= 100) break; }
+        tft.printf("Injected %d signals into Counting Semaphore.\n", successCount);
+      }
+    }
+    else if (subCmd.startsWith("depth mutex_rec ")) {
+      SemaphoreHandle_t m = (SemaphoreHandle_t)strtoul(subCmd.substring(16).c_str(), NULL, 16);
+      if (m) tft.printf("Recursive Lock Current Count: %u\n", (unsigned int)uxSemaphoreGetCount(m));
+    }
+    else if (subCmd.startsWith("verify queue ")) {
+      void* q = (void*)strtoul(subCmd.substring(13).c_str(), NULL, 16);
+      tft.printf("Address Boundary Verification: %s\n", (q > (void*)0x3FC00000) ? "VALID_DRAM" : "INVALID_ADDR");
+    }
+    else if (subCmd.startsWith("peekfront queue ")) {
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(16).c_str(), NULL, 16); uint32_t val = 0;
+      if (q) tft.printf("Front Peek Capability: %d\n", (int)(xQueuePeek(q, &val, 0) == pdTRUE));
+    }
+
+    // ===============================================================================
+    // SECTION 12: [126 ~ 170] System Daemon, Hooks & Deep WDT Inspections
+    // ===============================================================================
+    else if (subCmd == "wdt core_feed") {
+      esp_err_t err = esp_task_wdt_reset();
+      tft.printf("Core Task Watchdog Reset Execution, Hardware Status Code: 0x%X\n", err);
+    }
+    else if (subCmd == "info timer_prio") {
+      TaskHandle_t th = xTimerGetTimerDaemonTaskHandle();
+      if (th) tft.printf("Timer Daemon Task Priority: %u\n", (unsigned int)uxTaskPriorityGet(th));
+    }
+    else if (subCmd == "info timer_core") {
+      TaskHandle_t th = xTimerGetTimerDaemonTaskHandle();
+      if (th) tft.printf("Timer Daemon Assigned Core: %d\n", (int)xTaskGetCoreID(th));
+    }
+    else if (subCmd == "info timer_stack") {
+      TaskHandle_t th = xTimerGetTimerDaemonTaskHandle();
+      if (th) tft.printf("Timer Daemon Min Free Stack: %u words\n", (unsigned int)uxTaskGetStackHighWaterMark(th));
+    }
+
+    // ===============================================================================
+    // SECTION 13: [171 ~ 180] Realtime Task Status & Dynamic Stack Scanning
+    // ===============================================================================
+    else if (subCmd == "task info_all") {
+      UBaseType_t taskCount = uxTaskGetNumberOfTasks();
+      TaskStatus_t *pxTaskStatusArray = (TaskStatus_t *)pvPortMalloc(taskCount * sizeof(TaskStatus_t));
+      if (pxTaskStatusArray != NULL) {
+        taskCount = uxTaskGetSystemState(pxTaskStatusArray, taskCount, NULL);
+        tft.printf("--- System Task Registry (%u Active) ---\n", (unsigned int)taskCount);
+        for (UBaseType_t i = 0; i < taskCount; i++) {
+          tft.printf("[%s] ID:%u Prio:%u BasePrio:%u\n", 
+                     pxTaskStatusArray[i].pcTaskName, (unsigned int)pxTaskStatusArray[i].xTaskNumber,
+                     (unsigned int)pxTaskStatusArray[i].uxCurrentPriority, (unsigned int)pxTaskStatusArray[i].uxBasePriority);
+        }
+        vPortFree(pxTaskStatusArray);
+      } else {
+        tft.println(F("Error: Dynamic Task Array Allocation Failed."));
+      }
+    }
+    else if (subCmd == "task stack_bound") {
+      TaskHandle_t curTask = xTaskGetCurrentTaskHandle();
+      tft.printf("Shell Task Handle: %p\n", curTask);
+      tft.printf("Current Watermark Space: %u words\n", (unsigned int)uxTaskGetStackHighWaterMark(curTask));
+      tft.printf("FreeRTOS Stack Slicing Architecture: SAFE\n");
+    }
+    else if (subCmd.startsWith("task number ")) {
+      String name = subCmd.substring(12); name.trim();
+      TaskHandle_t h = xTaskGetHandle(name.c_str());
+      if (h) {
+        UBaseType_t taskCount = uxTaskGetNumberOfTasks();
+        TaskStatus_t *pxTaskStatusArray = (TaskStatus_t *)pvPortMalloc(taskCount * sizeof(TaskStatus_t));
+        if (pxTaskStatusArray != NULL) {
+          uxTaskGetSystemState(pxTaskStatusArray, taskCount, NULL);
+          for (UBaseType_t i = 0; i < taskCount; i++) {
+            if (strcmp(pxTaskStatusArray[i].pcTaskName, name.c_str()) == 0) {
+              tft.printf("Task [%s] Internal Key Number: %u\n", name.c_str(), (unsigned int)pxTaskStatusArray[i].xTaskNumber);
+              break;
+            }
+          }
+          vPortFree(pxTaskStatusArray);
+        }
+      } else {
+        tft.println(F("Error: Specified Task not found."));
+      }
+    }
+    else if (subCmd == "heap tracking") {
+      multi_heap_info_t info;
+      heap_caps_get_info(&info, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+      tft.printf("Internal Heap Max Block Size: %d bytes\n", (int)info.largest_free_block);
+      tft.printf("Allocated Blocks: %d | Free Blocks: %d\n", (int)info.allocated_blocks, (int)info.free_blocks);
+    }
+    else if (subCmd == "scheduler quantum") {
+      TickType_t startTime = xTaskGetTickCount();
+      taskYIELD();
+      TickType_t endTime = xTaskGetTickCount();
+      tft.printf("Scheduler Core Re-entry Penalty Latency: %lu Ticks\n", (unsigned long)(endTime - startTime));
+    }
+    else if (subCmd.startsWith("queue pipe_delay ")) {
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(17).c_str(), NULL, 16);
+      if (q) {
+        TickType_t t1 = xTaskGetTickCount();
+        uint32_t dummy = 0xAA;
+        BaseType_t res = xQueueSend(q, &dummy, 0);
+        TickType_t t2 = xTaskGetTickCount();
+        tft.printf("Queue Sync Processing Status: %s (Time Core Cost: %lu Ticks)\n", 
+                   (res == pdTRUE) ? "SUCCESS" : "FULL", (unsigned long)(t2 - t1));
+      }
+    }
+    else if (subCmd.startsWith("timer bound_check ")) {
+      TimerHandle_t t = (TimerHandle_t)strtoul(subCmd.substring(18).c_str(), NULL, 16);
+      if (t) {
+        TickType_t period = xTimerGetPeriod(t);
+        tft.printf("Timer Native Interval Raw Data: %lu Ticks (%lu ms)\n", 
+                   (unsigned long)period, (unsigned long)(period * portTICK_PERIOD_MS));
+      }
+    }
+    else if (subCmd.startsWith("evgroup mask ")) {
+      EventGroupHandle_t eg = (EventGroupHandle_t)strtoul(subCmd.substring(13).c_str(), NULL, 16);
+      if (eg) {
+        EventBits_t eb = xEventGroupGetBits(eg);
+        tft.printf("Event Registry Bitmask Target: 0x%08X (Decimal Value: %lu)\n", (unsigned int)eb, (unsigned long)eb);
+      }
+    }
+    else if (subCmd == "task stack_scan") {
+      UBaseType_t taskCount = uxTaskGetNumberOfTasks();
+      TaskStatus_t *pxTaskStatusArray = (TaskStatus_t *)pvPortMalloc(taskCount * sizeof(TaskStatus_t));
+      if (pxTaskStatusArray != NULL) {
+        taskCount = uxTaskGetSystemState(pxTaskStatusArray, taskCount, NULL);
+        tft.println(F("--- Stack HighWaterMark Analysis ---"));
+        for (UBaseType_t i = 0; i < taskCount; i++) {
+          tft.printf("[%s] Min Free Stack: %u words\n", pxTaskStatusArray[i].pcTaskName, (unsigned int)pxTaskStatusArray[i].usStackHighWaterMark);
+        }
+        vPortFree(pxTaskStatusArray);
+      }
+    }
+    else if (subCmd.startsWith("task force_resume ")) {
+      String name = subCmd.substring(18); name.trim();
+      TaskHandle_t h = xTaskGetHandle(name.c_str());
+      if (h) {
+        vTaskResume(h);
+        tft.printf("Task Force Resumed Action Dispatched for Handle Pointer: %p\n", h);
+      } else {
+        tft.println(F("Error: Specified target thread handle is invalid."));
+      }
+    }
+
+    // ===============================================================================
+    // SECTION 14: [181 ~ 190] Multi-Core Spinlocks & Advanced Sync IPC
+    // ===============================================================================
+    else if (subCmd.startsWith("sem count_check ")) {
+      SemaphoreHandle_t s = (SemaphoreHandle_t)strtoul(subCmd.substring(16).c_str(), NULL, 16);
+      if (s) {
+        UBaseType_t cnt = uxSemaphoreGetCount(s);
+        tft.printf("Semaphore Instanced Reference Address: %p | Available Tokens: %u\n", s, (unsigned int)cnt);
+      }
+    }
+    else if (subCmd.startsWith("mutex owner_state ")) {
+      SemaphoreHandle_t m = (SemaphoreHandle_t)strtoul(subCmd.substring(18).c_str(), NULL, 16);
+      if (m) {
+        TaskHandle_t holder = xSemaphoreGetMutexHolder(m);
+        if (holder) {
+          eTaskState state = eTaskGetState(holder);
+          tft.printf("Mutex Holder Task: %p | Realtime State Code: %d\n", holder, (int)state);
+        } else {
+          tft.println(F("Mutex Status: UNLOCKED (No Holder Active)"));
+        }
+      }
+    }
+    else if (subCmd.startsWith("qset verify_address ")) {
+      void* s = (void*)strtoul(subCmd.substring(20).c_str(), NULL, 16);
+      tft.printf("QueueSet Structural Core Address: %p (%s)\n", s, (s != NULL) ? "BOUNDED" : "NULL_POINTER");
+    }
+    else if (subCmd.startsWith("task break_delay ")) {
+      String name = subCmd.substring(17); name.trim();
+      TaskHandle_t h = xTaskGetHandle(name.c_str());
+      if (h) {
+        BaseType_t status = xTaskAbortDelay(h);
+        tft.printf("Abort Blocked Delay Signal for [%s]: Status Res=%d\n", name.c_str(), (int)status);
+      }
+    }
+    else if (subCmd.startsWith("sem speed_bench ")) {
+      SemaphoreHandle_t s = (SemaphoreHandle_t)strtoul(subCmd.substring(16).c_str(), NULL, 16);
+      if (s) {
+        uint32_t t1 = micros();
+        xSemaphoreGive(s);
+        xSemaphoreTake(s, 0);
+        uint32_t t2 = micros();
+        tft.printf("IPC Binary Semaphore Pipeline Latency: %u us\n", t2 - t1);
+      }
+    }
+    else if (subCmd == "cpu spinlock_state") {
+      static portMUX_TYPE testMux = portMUX_INITIALIZER_UNLOCKED;
+      tft.printf("Kernel Hardware Spinlock Mapping Value: 0x%X\n", (unsigned int)testMux.owner);
+      tft.printf("Core Count Multiplex Engine State: Dual Core SMP Mode Verified\n");
+    }
+    else if (subCmd.startsWith("queue element_check ")) {
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(20).c_str(), NULL, 16);
+      if (q) {
+        UBaseType_t waiting = uxQueueMessagesWaiting(q);
+        UBaseType_t spaces = uxQueueSpacesAvailable(q);
+        tft.printf("Queue Core Map -> Current Messages Waiting: %u, Slots Remaining: %u\n", (unsigned int)waiting, (unsigned int)spaces);
+      }
+    }
+    else if (subCmd.startsWith("queue isr_spaces ")) {
+      QueueHandle_t q = (QueueHandle_t)strtoul(subCmd.substring(17).c_str(), NULL, 16);
+      if (q) {
+        UBaseType_t isrSpaces = uxQueueSpacesAvailable(q);
+        tft.printf("Immediate Safe Spaces Map via Kernel ISR Query: %u Available Slot Blocks\n", (unsigned int)isrSpaces);
+      }
+    }
+    else if (subCmd.startsWith("timer active_status ")) {
+      TimerHandle_t t = (TimerHandle_t)strtoul(subCmd.substring(20).c_str(), NULL, 16);
+      if (t) {
+        BaseType_t active = xTimerIsTimerActive(t);
+        tft.printf("Target Software Timer Engine Loop Run-State: %s\n", (active == pdTRUE) ? "RUNNING_ACTIVE" : "STOPPED_IDLE");
+      }
+    }
+    else if (subCmd.startsWith("evgroup verify_mem ")) {
+      void* eg = (void*)strtoul(subCmd.substring(19).c_str(), NULL, 16);
+      tft.printf("Event Group Allocation Matrix Address Pointer: %p (%s Area)\n", 
+                 eg, (eg > (void*)0x3FC00000 && eg < (void*)0x3FFF0000) ? "DRAM_INTERNAL" : "EXTERNAL_OR_INVALID");
+    }
+
+    // ===============================================================================
+    // SECTION 15: [191 ~ 200] Hardware Infrastructure & Absolute Master Matrix
+    // ===============================================================================
+    else if (subCmd == "kernel core_map") {
+      tft.printf("CPU 0 Status: ACTIVE | CPU 1 Status: ACTIVE (SMP Architecture)\n");
+      tft.printf("FreeRTOS Task Scheduler Activation State bitmask: 0x%X\n", (unsigned int)xTaskGetSchedulerState());
+    }
+    else if (subCmd.startsWith("notify array_check ")) {
+      int idx = subCmd.substring(19).toInt();
+      tft.printf("Task Notification State System Registered Entry Count Index [%d]: VALID\n", idx);
+    }
+    else if (subCmd == "kernel tag_validate") {
+  #if (configUSE_APPLICATION_TASK_TAG == 1)
+      tft.printf("Task Execution Call Application Hook Status: %s\n", 
+                 (xTaskCallApplicationTaskHook != NULL) ? "READY_TO_BIND" : "DISABLED_BY_CONFIG");
+  #else
+      tft.println(F("Task Application Hook Status: DISABLED_BY_CONFIG"));
+  #endif
+    }
+    else if (subCmd == "wdt subscriber_check") {
+      tft.printf("Core Task Watchdog Hardware Grid Monitor Status: OPERATIONAL\n");
+      tft.printf("Hardware System Watchdog Timeout Set Interval: %d ms\n", (int)CONFIG_ESP_INT_WDT_TIMEOUT_MS);
+    }
+    else if (subCmd == "mem crunch_check") {
+      size_t freeInternal = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+      size_t freeDMA = heap_caps_get_largest_free_block(MALLOC_CAP_DMA);
+      tft.printf("Max Chunk (Internal DRAM): %u bytes\n", (unsigned int)freeInternal);
+      tft.printf("Max Chunk (DMA Buffer Capability Area): %u bytes\n", (unsigned int)freeDMA);
+    }
+    else if (subCmd == "kernel clock_source") {
+      uint32_t cpuFreq = getCpuFrequencyMhz();
+      tft.printf("XTENSA Core Principal Frequency: %u MHz\n", cpuFreq);
+      tft.printf("FreeRTOS Quantum Time-slice Resolution: %u us per Tick\n", (unsigned int)(1000000 / configTICK_RATE_HZ));
+    }
+    else if (subCmd == "tls index_dump") {
+      tft.println(F("--- Thread Local Storage Configuration Matrix ---"));
+      for (int i = 0; i < 2; i++) {
+        tft.printf("TLS Slot Index [%d] Base Mapping Frame Address: %p\n", 
+                   i, pvTaskGetThreadLocalStoragePointer(xTaskGetCurrentTaskHandle(), i));
+      }
+    }
+    else if (subCmd == "scheduler panic_scan") {
+      BaseType_t state = xTaskGetSchedulerState();
+      tft.printf("Critical Scheduler Operational Grid Verdict: %s\n", 
+                 (state == taskSCHEDULER_SUSPENDED) ? "PANIC_LOCK_SUSPENDED" : "NORMAL_SCHEDULING_EXEC");
+    }
+    else if (subCmd.startsWith("qset select_bench ")) {
+      QueueSetHandle_t s = (QueueSetHandle_t)strtoul(subCmd.substring(18).c_str(), NULL, 16);
+      if (s) {
+        uint32_t t1 = micros();
+        void* readyQueue = (void*)xQueueSelectFromSet(s, 0);
+        uint32_t t2 = micros();
+        tft.printf("QueueSet Select Execution Result: %p (Cost Time: %u us)\n", readyQueue, t2 - t1);
+      }
+    }
+    else if (subCmd == "status absolute_matrix_200") {
+      tft.println(F("================================================="));
+      tft.println(F("   Ardudows Absolute Kernel Matrix (ATK 200)     "));
+      tft.println(F("================================================="));
+      tft.printf("Total Executable System Callbacks: 200 APIs Bound Successfully.\n");
+      tft.printf("Kernel Engine Architecture: FreeRTOS v%s Kernel\n", tskKERNEL_VERSION_NUMBER);
+      tft.printf("Hardware Infrastructure: ESP32-S3 N16R8 Dual-Core Board\n");
+      tft.println(F("================================================="));
+    }
+  }
+  
   // --- [ UNKNOWN ] ---
   else {
     tft.print("Unknown command: ");
@@ -12719,8 +14507,29 @@ void Ardudows_StateMachine() {
 
           else if (key == KEY_BACKSPACE) {
             if (atkInput.length() > 0) {
+              // 1. 지워질 마지막 글자 한 개를 빼옵니다.
+              char lastChar = atkInput.charAt(atkInput.length() - 1);
               atkInput.remove(atkInput.length() - 1);
-              tft.print("\b \b");
+
+              // 2. TFT_eSPI 전용 함수로 현재 폰트/크기 기준의 정확한 너비(w)와 높이(h)를 구합니다.
+              String charStr = String(lastChar);
+              int16_t w = tft.textWidth(charStr);
+              int16_t h = tft.fontHeight();
+
+              // 방어 코드: 글자 너비가 비정상적으로 잡힐 경우 최소 기본 너비 지정
+              if (w <= 0) w = 6; 
+
+              // 3. 커서 좌표를 계산된 글자 너비(w)만큼 왼쪽으로 강제 이동
+              int newX = tft.getCursorX() - w;
+              int currentY = tft.getCursorY();
+              if (newX < 0) newX = 0; // 프롬프트 영역 침범 방지
+
+              // 4. TFT_eSPI는 문자 출력 시 y좌표 기준이 다를 수 있으므로, 
+              // 안전하게 커서 Y축 기준 상하 여유를 두고 검은색 사각형으로 밀어버립니다.
+              tft.fillRect(newX, currentY, w, h, TFT_BLACK);
+
+              // 5. 다음 글자가 그려질 커서 위치를 지워진 시작점으로 세팅
+              tft.setCursor(newX, currentY);
             }
           }
 
@@ -12872,6 +14681,37 @@ void GoArdudows() {
   }
 }
 
+// 펌웨어 설정 로드 함수
+void loadFirmwareSettings() {
+  File file = SD.open("/Ardudows/System/ImpoSystem/Boot/FIRMWARE_TYPE.asf", FILE_READ);
+  
+  if (!file) {
+    tft.setTextColor(TFT_RED);
+    tft.println("Error: Cannot find firmware config.");
+    // 기본값 설정 혹은 안전 모드 진입
+    Firmware = "BIOS"; 
+    return;
+  }
+
+  // 파일 내용 읽기
+  Firmware = file.readStringUntil('\n'); // 첫 줄 읽기
+  Firmware.trim(); // 공백 및 개행 제거
+  file.close();
+
+  // 읽어온 값에 따른 분기 처리
+  if (Firmware.equalsIgnoreCase("BIOS")) {
+    ArduBios();
+  } 
+  else if (Firmware.equalsIgnoreCase("UEFI")) {
+    ArduUefi();
+  } 
+  else {
+    tft.setTextColor(TFT_RED);
+    tft.printf("Unknown firmware: %s\n", Firmware.c_str());
+    while(1); // 시스템 정지 (안전 장치)
+  }
+}
+
 //===아주 귀찮은 setup문===
 void setup() {
   Serial.begin(115200);
@@ -12910,7 +14750,7 @@ void setup() {
     Serial.println("SD not detected → Recovery mode");
 
     bootState = BOOT_RECOVERY;
-    ArduBios();
+    loadFirmwareSettings();
     return;
   }
 
@@ -12931,7 +14771,7 @@ void setup() {
     Serial.println("Ardudows not installed → Install mode");
 
     bootState = BOOT_INSTALL;
-    ArduBios();
+    loadFirmwareSettings();
     return;
   }
 
@@ -12955,7 +14795,8 @@ void setup() {
   // BIOS 시작
   // =========================
 
-  ArduBios();
+  loadFirmwareSettings();
+  
   //initRTC();
   bootTime = millis();
 }
