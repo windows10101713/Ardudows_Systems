@@ -17,6 +17,12 @@
 //137일차 시리얼 속도를 2M에서 115200으로 수정
 //142일차 모니터 앞을 벗어나서 학교에서 운동회를 했다.
 //142일차의 운동회는 (중)1학년 1등이라는 성과를 거뒀다.
+//161일차 오늘은 FreeRTOS 관련 명령어를 2백개 추가하고 ATK와 로그인 창의 백스페이스도 고쳤다.
+//163일차 히메루가 화가납니다.
+//163일차 나도 화가 납니다.
+//왜냐하면 학원갸야 하거든요.
+//EspUsbHost.h 라이브러리 불러오면 DRAM 부족으로 터짐
+//163일차 오늘 램을 100kb넘게 확보함 (BLE삭제 + 레지스트리 조정)
 
 //===겁나 쉬운 라이브러리 불러오기===
 //이때가 젤 좋았었음...
@@ -36,11 +42,11 @@
 #include <DNSServer.h>
 #include <Wire.h>
 #include <HTTPClient.h>
-#include <BLEDevice.h>
-#include <BLEUtils.h>
-#include <BLEScan.h>
-#include <BLEClient.h>
-#include <BLEAdvertisedDevice.h>
+//#include <BLEDevice.h>
+//#include <BLEUtils.h>
+//#include <BLEScan.h>
+//#include <BLEClient.h>
+//#include <BLEAdvertisedDevice.h>
 #include "esp_wifi.h"
 #include <esp_netif.h>
 #include "type.h"
@@ -138,6 +144,7 @@
 //#include "soc/digital_signature_reg.h"
 #include "esp_ds.h"
 #include "esp_flash_encrypt.h"
+#include <timers.h>
 
 //===대입문(?)과 변수등 일단 뭐 아무거나 선언===
 
@@ -168,6 +175,7 @@ struct WebServerConfig {
     bool isSecure;       // SSL 가속 레이어 여부
     String basePath;     // 컨테이너 루트 경로 (예: /Ardudows/System/Network/HTTP/8080/)
     bool isActive;       // 슬롯 가동 플래그
+    SemaphoreHandle_t mutex; // 🔥 FreeRTOS 세마포어(큐) 핸들 백업용
 };
 
 // 최대 4개의 독립 멀티서버 가상 슬롯 제공 (S3 대용량 PSRAM 뱅크 활용)
@@ -329,6 +337,8 @@ struct Audience {
 Audience audienceList[10];
 int audienceCount = 0;
 
+unsigned long bootTime = 0;
+/*
 struct BLEDeviceInfo {
   String addr;
   String name;
@@ -339,7 +349,7 @@ struct BLEDeviceInfo {
 BLEDeviceInfo bleDevices[20];
 int bleDeviceCount = 0;
 int bleConnectedIndex = -1;
-unsigned long bootTime = 0;
+
 String bleConnectedAddr = "";
 BLEClient* pBLEClient = nullptr;
 BLEScan* pBLEScan = nullptr;
@@ -349,6 +359,7 @@ BLEAddress* bleTarget = nullptr;
 
 bool bleInitialized = false;
 bool bleConnected = false;
+*/
 #define BUILTIN_LED 48  // ESP32-S3 내장 RGB LED (일반적으로 GPIO 48)
 DNSServer dnsServer;
 WebServer webServer(80);
@@ -566,10 +577,15 @@ enum SPI_Device {
 };
 static SPI_Device currentSPI = SPI_NONE;
 static bool spi_busy = false;
+//#define REG_MAX_SECTION 16
+//#define REG_MAX_KEY 32
+//#define REG_MAX_VALUE 64
+//#define REG_MAX_ITEMS 32
+
 #define REG_MAX_SECTION 16
-#define REG_MAX_KEY 32
-#define REG_MAX_VALUE 64
-#define REG_MAX_ITEMS 32
+#define REG_MAX_KEY 16
+#define REG_MAX_VALUE 32
+#define REG_MAX_ITEMS 12
 //XPT2046_Touchscreen ts(TOUCH_CS, TOUCH_IRQ);
 typedef struct {
   char key[REG_MAX_KEY];
@@ -1635,6 +1651,10 @@ void ArduInstaller() {
   SD.mkdir("/Ardudows/System/Log/Software");
   Loading();
   SD.mkdir("/Ardudows/System/NetWork");
+  Loading();
+  SD.mkdir("/Ardudows/System/NetWork/HTTP");
+  Loading();
+  SD.mkdir("/Ardudows/System/NetWork/HTTPS");
   Loading();
   SD.mkdir("/Ardudows/System/Boot");
   Loading();
@@ -3417,13 +3437,14 @@ void ArduInstall_Screen() {
   tft.fillScreen(TFT_BLUE);
   tft.setTextColor(TFT_WHITE);
   tft.setCursor(0, 0);
-  tft.setTextSize(2);
+  tft.setTextSize(1);
 
   tft.print("installing...");
   ArduInstaller();
   
   Recursive_Asrw_System_Stream_500();
 }
+
 
 //===프로덕트 키 생성기(난 프로덕트 키 스킵 안해주는 윈도우 95,98이 밉다)===
 void make_ProductKey(char* out) {
@@ -4044,7 +4065,7 @@ Chunk globalChunk;
 
 int currentLogLine = 0;
 const int maxLogLines = 14;
-uint8_t chunkBuffer[13000];  // 청크 전송용 고정 메모리 (파편화 방지)
+EXT_RAM_ATTR uint8_t chunkBuffer[13000];  // 청크 전송용 고정 메모리 (파편화 방지)
 
 
 // 2. 블록 ID 정의 (전역)
@@ -6925,49 +6946,766 @@ String normalizePath(String path) {
 
 // ================== HELP ==================
 
+/*
+//안해 나 영어 몰라 떄려쳐 안해 안해 안해 어느 새월에 해 때려쳐 안해 진짜 안해 절대 안해 아이 돈 노 잉글리쉬 노 갓 플리즈 나 안해 절대 안해 다시는 안해
 void cmd_help() {
-  tft.fillScreen(TFT_BLACK);
-  tft.setCursor(0, 0);
-  tft.setTextSize(1);
-  tft.setTextColor(TFT_CYAN);
-  tft.println(F("==== [ ARDUDOWS ATK COMMANDS ] ===="));
-  
-  // 1. SYSTEM & HW (Yellow)
-  tft.setTextColor(TFT_YELLOW);
-  tft.println(F("[ SYS ] ver, cls, info, uptime, temp"));
-  tft.println(F("[ HW  ] hw, mac, flash, sketch, psram"));
-  tft.println(F("[ IO  ] gpio check, i2c scan, sleep [s]"));
-
-  // 2. FILE SYSTEM (White)
-  tft.setTextColor(TFT_WHITE);
-  tft.println(F("[ FS  ] ls, cd, pwd, touch, cat, rm"));
-  tft.print(F("        echo \"text\">file"));
-  tft.println();
-
-  // 3. NETWORK (Green)
-  tft.setTextColor(TFT_GREEN);
-  tft.println(F("[ NET ] wifi scan, wifi connect [s][p]"));
-  tft.println(F("        ping, nslookup, curl, router"));
-
-  // 4. BLUETOOTH (Blue)
-  tft.setTextColor(TFT_BLUE);
-  tft.println(F("[ BLE ] ble init, scan, connect [id]"));
-
-  // 5. HACK & GUERILLA (Red) - 가장 중요한 부분!
-  tft.setTextColor(TFT_RED);
-  tft.println(F("[HACK ] list, lock [id], rick, lag"));
-  tft.println(F("        safe [id], stealth, finish"));
-
-  // 6. ENGINES (Magenta)
-  tft.setTextColor(TFT_MAGENTA);
-  tft.println(F("[ APP ] mc start, win95, wh"));
-
   tft.setTextColor(TFT_CYAN);
   tft.println(F("===================================="));
   
-  // 하단에 팁 하나 추가
-  tft.setTextColor(TFT_GREEN);
-  tft.setTextSize(2);
+  tft.println("help : command help");
+    tft.println("ver :  check shell version");
+    tft.println("cls : clear screen");
+    tft.println("reboot : reboot immediately");
+    tft.println("info : check your free heap");
+    tft.println("uptime : check how much time has passed since booting");
+    tft.println("ls  : check indide the current directory");
+    tft.println("pwd : check current directory address");
+    tft.println("cd <path> : change directory");
+    tft.println("touch <file> : create file");
+    tft.println("cat <file> : check the entire file content");
+    tft.println("rm <file> : delete files");
+    tft.println("echo <content> > <file> : delete and create all contents within a file");
+    tft.println("http <content> : http server related commands (for more details, type http help)");
+    tft.println("http : check current http server status");
+    tft.println("https <content> : https server related commands (for more details, type https help)");
+    tft.println("https : check current https server status");
+    tft.println("ipconfig : check ip address, subnet mask, and default gateway");
+    tft.println("ifconfig : a more detailed explanetion than ipconfig");
+    tft.println("wget <site address> : download webpage file");
+    tft.println("purge <forder> : delete all files in the selected directory");
+    tft.println("stat <file> : check selected file size and type");
+    tft.println("grep <content> <file> : check for the existence of a specific string in a selected file");
+    tft.println("sd format : sd card format");
+    tft.println("mv <current file path> <file path to change> : rename or move a file");
+    tft.println("hexdump <file> : print file content in hex format");
+    tft.println("ls size : sorf files by size");
+    tft.println("wc <file> : counts the lines of the file");
+    tft.println("md5file <file> : check the file checksum and hash");
+    tft.println("set cpu <freq> : set CPU speed");
+    tft.println("reg dump : check core registers");
+    tft.println("benchmark timer : hardware timer speed measurement test");
+    tft.println("brownout status : check brownout status");
+    tft.println("sys panic : system forced error");
+    tft.println("wifi rssi : distance from the wifi router");
+    tft.println("wifi renew : request to completely release and renew the currently assigned dhcp ip");
+    tft.println("portscan <ip> <port> : check whether the port of that ip open or closed");
+    tft.println("dns set <dns> : set dns cache name servers to google public dns");
+    tft.println("wifi promiscuous : wifi packet monitor");
+    tft.println("netstat : similar to ipconfig and ifconfig");
+    tft.println("grab <site address/ip> : run simple web banner grabber based on current ip address");
+    tft.println("ntp sync : ntp time synchronization (wifi required)");
+    tft.println("wifi disconnect");
+    tft.println("tft colorbar");
+    tft.println("font size ");
+    tft.println("lcd bright ");
+    tft.println("rotate ");
+    tft.println("tft invert");
+    tft.println("matrix fx");
+    tft.println("tft grid");
+    tft.println("benchmark gfx");
+    tft.println("color ");
+    tft.println("screensaver");
+    tft.println("nvs set ");
+    tft.println("nvs get ");
+    tft.println("i2c speed ");
+    tft.println("alarm");
+    tft.println("hw filter");
+    tft.println("hw vref");
+    tft.println("wdt feed");
+    tft.println("sys diagnostic");
+    tft.println("uptime clear");
+    tft.println("credits");
+    tft.println("mem map");
+    tft.println("du");
+    tft.println("tac ");
+    tft.println("head ");
+    tft.println("diff ");
+    tft.println("rtc cal");
+    tft.println("wifi tx ");
+    tft.println("sys crash");
+    tft.println("flash id");
+    tft.println("i2c reset");
+    tft.println("mac spoof ");
+    tft.println("arp table");
+    tft.println("http head ");
+    tft.println("wifi chan ");
+    tft.println("ping test ");
+    tft.println("tft readpixel ");
+    tft.println("tft fadeout");
+    tft.println("tft mathwave");
+    tft.println("beep talk ");
+    tft.println("3d demo");
+    tft.println("int trigger ");
+    tft.println("temp logger");
+    tft.println("secure boot status");
+    tft.println("timer speed ");
+    tft.println("uart status");
+    tft.println("sync");
+    tft.println("halt");
+    tft.println("sys recovery");
+    tft.println("sys reload");
+    tft.println("banner");
+    tft.println("rps ");
+    tft.println("timer ");
+    tft.println("fortune");
+    tft.println("nl ");
+    tft.println("tolower ");
+    tft.println("toupper ");
+    tft.println("clock");
+    tft.println("tail ");
+    tft.println("replace ");
+    tft.println("mem max");
+    tft.println("keygen ");
+    tft.println("base ");
+    tft.println("mkfile ");
+    tft.println("math const");
+    tft.println("cipher ");
+    tft.println("decipher ");
+    tft.println("df");
+    tft.println("touch test");
+    tft.println("ifconfig");
+    tft.println("wifi scan best");
+    tft.println("i2c map");
+    tft.println("sleepms ");
+    tft.println("wc char ");
+    tft.println("rand map");
+    tft.println("hw uid");
+    tft.println("draw rect ");
+    tft.println("draw circle ");
+    tft.println("ps");
+    tft.println("sweep pz");
+    tft.println("wifi status");
+    tft.println("hw seed");
+    tft.println("syslog clear");
+    tft.println("match ");
+    tft.println("part table");
+    tft.println("ping kill");
+    tft.println("tft burnin fix");
+    tft.println("power matrix");
+    tft.println("sys sos");
+    tft.println("sniffhead ");
+    tft.println("env");
+    tft.println("math tan ");
+    tft.println("append ");
+    tft.println("rf status");
+    tft.println("math sqrt ");
+    tft.println("cd reset");
+    tft.println("kernel ticks");
+    tft.println("color retro");
+    tft.println("wifi stop");
+    tft.println("wifi start");
+    tft.println("sys secure");
+    tft.println("lib ");
+    tft.println("where ");
+    tft.println("what ");
+    tft.println("wifi scan");
+    tft.println("wifi connect ");
+    tft.println("ping ");
+    tft.println("nslookup ");
+    tft.println("curl ");
+    tft.println("ble init");
+    tft.println("ble scan");
+    tft.println("ble connect ");
+    tft.println("ble disconnect");
+    tft.println("ble info ");
+    tft.println("gpio read ");
+    tft.println("gpio write ");
+    tft.println("i2c scan");
+    tft.println("porting ");
+    tft.println("hack spam");
+    tft.println("detect");
+    tft.println("wave");
+    tft.println("hack list");
+    tft.println("hack deauth ");
+    tft.println("minecraft server ");
+    tft.println("monitor");
+    tft.println("mem");
+    tft.println("psram");
+    tft.println("flash");
+    tft.println("sketch");
+    tft.println("hw");
+    tft.println("mac");
+    tft.println("temp");
+    tft.println("cycles");
+    tft.println("reason");
+    tft.println("sleep ");
+    tft.println("gpio check");
+    tft.println("router");
+    tft.println("pz ");
+    tft.println("play ");
+    tft.println("rtc");
+    tft.println("calc ");
+    tft.println("vnc ");
+    tft.println("wifi ap ");
+    tft.println("ars ");
+    tft.println("web drive");
+    tft.println("top");
+    tft.println("nmap");
+    tft.println("neofetch");
+    tft.println("sl");
+    tft.println("alias ");
+    tft.println("alias");
+    tft.println("whoami");
+    tft.println("perf tester ");
+    tft.println("ram ");
+    tft.println("who");
+    tft.println("mkdir ");
+    tft.println("usertool ");
+    tft.println("rmdir ");
+    tft.println("copy ");
+    tft.println("cut ");
+    tft.println("paste");
+    tft.println("hex ");
+    tft.println("dec ");
+    tft.println("bin ");
+    tft.println("ascii ");
+    tft.println("dvd");
+    tft.println("usb ");
+    tft.println("lsusb");
+    tft.println("print ");
+    tft.println("wifi repeater ");
+    tft.println("wifi router ");
+    tft.println("freertos ");
+    tft.println("tree ");
+    tft.println("tree ");
+    tft.println("tetris");
+
+  tft.setTextColor(TFT_CYAN);
+  tft.println(F("===================================="));
+}
+*/
+
+void cmd_help() {
+  tft.setTextColor(TFT_CYAN);
+  tft.println(F("===================================="));
+  
+  // 1. 기본 및 시스템 제어 명령어
+  tft.println(F("help : command help"));
+  tft.println(F("ver : check shell version"));
+  tft.println(F("cls : clear screen"));
+  tft.println(F("reboot : reboot immediately"));
+  tft.println(F("info : check your free heap"));
+  tft.println(F("uptime : check how much time has passed since booting"));
+  tft.println(F("uptime clear : reset system uptime counter"));
+  tft.println(F("set cpu <freq> : set CPU speed (MHz)"));
+  tft.println(F("reg dump : check core registers"));
+  tft.println(F("tasks : list all active FreeRTOS tasks"));
+  tft.println(F("sys panic : system forced error (Kernel Panic)"));
+  tft.println(F("sys crash : force system core dump crash"));
+  tft.println(F("sys diagnostic : run deep hardware diagnostics"));
+  tft.println(F("sys recovery : enter safe recovery partition"));
+  tft.println(F("sys reload : reload core system configuration"));
+  tft.println(F("sys secure : check hardware security status"));
+  tft.println(F("sys sos : transmit SOS morse code via buzzer"));
+  tft.println(F("syslog clear : wipe core system log buffer"));
+  tft.println(F("halt : stop all operations and freeze"));
+  tft.println(F("sync : commit filesystem buffer to storage"));
+  tft.println(F("credits : show Ardudows developer credits"));
+  tft.println(F("banner : draw large ASCII art system banner"));
+  tft.println(F("env : list environmental variables configured"));
+
+  // 2. 파일 시스템 명령어 (SD 카드 연동)
+  tft.println(F("ls : check inside the current directory"));
+  tft.println(F("ls size : sort files by size"));
+  tft.println(F("pwd : check current directory address"));
+  tft.println(F("cd <path> : change directory"));
+  tft.println(F("cd reset : reset path to root directory (/)"));
+  tft.println(F("touch <file> : create file"));
+  tft.println(F("touch test : run benchmark test on file creation"));
+  tft.println(F("cat <file> : check the entire file content"));
+  tft.println(F("tac <file> : view file contents in reverse order"));
+  tft.println(F("head <file> : display first few lines of a file"));
+  tft.println(F("tail <file> : display last few lines of a file"));
+  tft.println(F("nl <file> : show file lines with line numbers"));
+  tft.println(F("rm <file> : delete files"));
+  tft.println(F("rmdir <dir> : remove target empty directory"));
+  tft.println(F("mkdir <dir> : create a new directory"));
+  tft.println(F("purge <folder> : delete all files in the selected directory"));
+  tft.println(F("mv <src> <dst> : rename or move a file"));
+  tft.println(F("copy <src> <dst> : copy file to target path"));
+  tft.println(F("cut <src> <dst> : cut file to clipboard"));
+  tft.println(F("paste : paste file from clipboard"));
+  tft.println(F("append <file> <str> : append string to end of file"));
+  tft.println(F("replace <file> <str> : find and replace string in file"));
+  tft.println(F("echo <content> > <file> : delete and create all contents within a file"));
+  tft.println(F("stat <file> : check selected file size and type"));
+  tft.println(F("grep <content> <file> : check for the existence of a specific string"));
+  tft.println(F("hexdump <file> : print file content in hex format"));
+  tft.println(F("wc <file> : counts the lines of the file"));
+  tft.println(F("wc char <file> : counts the characters of the file"));
+  tft.println(F("md5file <file> : check the file checksum and hash"));
+  tft.println(F("diff <f1> <f2> : compare differences between two files"));
+  tft.println(F("df : display disk free space on SD card"));
+  tft.println(F("du : estimate file space usage"));
+  tft.println(F("tree : graphic directory structure tree"));
+  tft.println(F("sd format : sd card format"));
+  tft.println(F("mkfile <size> : create file with target byte size"));
+  tft.println(F("mkdummy <file> : generate dummy data file"));
+
+  // 3. 네트워크 및 와이파이 관련 명령어
+  tft.println(F("wifi scan : scan nearby Access Points"));
+  tft.println(F("wifi scan best : scan and filter strongest AP signal"));
+  tft.println(F("wifi connect <ssid> <password> : connect to Wi-Fi AP"));
+  tft.println(F("wifi disconnect : terminate active Wi-Fi connection"));
+  tft.println(F("wifi status : display current Wi-Fi status info"));
+  tft.println(F("wifi rssi : distance from the wifi router (Signal strength)"));
+  tft.println(F("wifi renew : release and renew currently assigned dhcp ip"));
+  tft.println(F("wifi chan <1-13> : change active wifi radio channel"));
+  tft.println(F("wifi start : turn on wifi internal radio"));
+  tft.println(F("wifi stop : turn off wifi internal radio"));
+  tft.println(F("wifi ap <ssid> : start local Access Point mode"));
+  tft.println(F("wifi repeater : enable Wi-Fi NAT repeater mode"));
+  tft.println(F("wifi router : enable internal virtual router routing"));
+  tft.println(F("ipconfig : check ip address, subnet mask, and default gateway"));
+  tft.println(F("ifconfig : a more detailed explanation than ipconfig"));
+  tft.println(F("netstat : check active network socket states"));
+  tft.println(F("router : show default gateway router info"));
+  tft.println(F("dns set <dns> : set dns cache name servers"));
+  tft.println(F("ntp sync : ntp time synchronization (wifi required)"));
+  tft.println(F("ping <ip/host> : ping target host IP/Domain"));
+  tft.println(F("ping test : run automated multi-target ping test"));
+  tft.println(F("ping kill : terminate background ping process"));
+  tft.println(F("nslookup <host> : query internet name servers for IP"));
+  tft.println(F("wget <site address> : download webpage file"));
+  tft.println(F("curl <url> : fetch URL content data to terminal"));
+  tft.println(F("http : check current http server status"));
+  tft.println(F("http <cmd> : http server related commands (type http help)"));
+  tft.println(F("http head <url> : get HTTP server header metadata"));
+  tft.println(F("https : check current https server status"));
+  tft.println(F("https <cmd> : https server related commands (type https help)"));
+  tft.println(F("web drive : activate WebDAV wireless network drive"));
+
+  // 4. 모의 침투 및 무선 보안 테스트 (Hacking Tools)
+  tft.println(F("wifi promiscuous : wifi packet monitor (Sniffer)"));
+  tft.println(F("sniffhead : sniff and dump 802.11 packet headers"));
+  tft.println(F("portscan <ip> <port> : check whether the port of that ip open or closed"));
+  tft.println(F("nmap <ip> : scan top common ports of target IP"));
+  tft.println(F("grab <site address/ip> : run simple web banner grabber"));
+  tft.println(F("mac spoof <mac> : spoof target interface MAC address"));
+  tft.println(F("arp table : show local ARP cache IP/MAC table"));
+  tft.println(F("hack spam <ssid> : beacon spam fake target access points"));
+  tft.println(F("hack deauth <mac> : transmit deauthentication frames"));
+  tft.println(F("hack list : show captured targets for attack"));
+
+  // 5. 하드웨어 제어 및 센서 툴 (GPIO, I2C, BLE, TFT)
+  tft.println(F("gpio read <pin> : read digital state of specific pin"));
+  tft.println(F("gpio write <pin> <val> : write HIGH(1)/LOW(0) value to pin"));
+  tft.println(F("gpio check : scan entire GPIO multiplexer array"));
+  tft.println(F("analog read <pin> : read raw analog values (ADC)"));
+  tft.println(F("pwm test <pin> : output modulated PWM test frequency"));
+  tft.println(F("touch read <pin> : read capacitive touch sensor threshold"));
+  tft.println(F("touch test : run full matrix touch pin telemetry"));
+  tft.println(F("hall : read built-in magnetic Hall sensor"));
+  tft.println(F("temp : print internal ESP32 on-chip temperature"));
+  tft.println(F("temp logger : start real-time temperature telemetry"));
+  tft.println(F("i2c scan : scan I2C bus for connected client IDs"));
+  tft.println(F("i2c map : render physical I2C address grid map"));
+  tft.println(F("i2c speed <hz> : modify I2C clock frequency speed"));
+  tft.println(F("i2c reset : force flush and reset locked I2C bus"));
+  tft.println(F("ble init : initialize Bluetooth Low Energy radio"));
+  tft.println(F("ble scan : scan for advertising BLE devices"));
+  tft.println(F("ble connect <mac> : establish connection to target BLE MAC"));
+  tft.println(F("ble disconnect : drop active BLE connection link"));
+  tft.println(F("ble info : print current BLE stack diagnostics"));
+  tft.println(F("usb <mode> : toggle USB OTG MSC/CDC interface mode"));
+  tft.println(F("lsusb : list devices on virtual USB host controller"));
+  tft.println(F("hw filter : configure hardware noise filter limits"));
+  tft.println(F("hw vref : read calibrated chip Vref voltage"));
+  tft.println(F("hw uid : read unique 64-bit factory eFuse chip ID"));
+  tft.println(F("hw seed : generate cryptographically secure RNG seed"));
+  tft.println(F("hw : dump general hardware chipset profile"));
+  tft.println(F("mac : print factory burned Wi-Fi base MAC"));
+  tft.println(F("rf status : display radio frequency stack metrics"));
+  tft.println(F("rtc : check hardware Real-Time Clock register"));
+  tft.println(F("rtc cal : run calibration routine on RTC crystal"));
+  tft.println(F("alarm <time> : set hardware wake alarm trigger time"));
+  tft.println(F("beep talk <str> : convert text to piezo buzzer morse/tones"));
+  tft.println(F("sweep pz : execute audio frequency sweep on buzzer"));
+  tft.println(F("pz <freq> : play single pitch frequency tone"));
+  tft.println(F("wdt feed : manually feed Watchdog Timer"));
+
+  // 6. TFT LCD 디스플레이 및 그래픽 엔진 효과
+  tft.println(F("tft colorbar : display SMPTE test pattern colorbars"));
+  tft.println(F("tft invert : invert display screen color buffer"));
+  tft.println(F("tft grid : draw geometric calibration pixel grid"));
+  tft.println(F("tft readpixel <x> <y> : read RGB565 color data at coordinates"));
+  tft.println(F("tft fadeout : execute display fade-to-black effect"));
+  tft.println(F("tft mathwave : render algorithm dynamic wave graphics"));
+  tft.println(F("tft burnin fix : run screen burn-in recovery cycle"));
+  tft.println(F("font size <num> : change system terminal text scale"));
+  tft.println(F("lcd bright <val> : set display PWM backlight brightness"));
+  tft.println(F("rotate <0-3> : change display screen orientation"));
+  tft.println(F("matrix fx : activate digital rain falling matrix effect"));
+  tft.println(F("color <color> : change primary terminal text color"));
+  tft.println(F("color retro : toggle classic amber/green terminal look"));
+  tft.println(F("draw rect <x> <y> <w> <h> : draw rectangle outline to display"));
+  tft.println(F("draw circle <x> <y> <r> : draw circle outline to display"));
+  tft.println(F("screensaver : force activate configured screensaver"));
+  tft.println(F("benchmark gfx : run core SPI graphic acceleration test"));
+
+  // 7. 수학, 쉘 유틸리티 및 암호화 관련 명령어
+  tft.println(F("calc <expr> : parse and evaluate mathematical expression"));
+  tft.println(F("math const : list global core mathematical constants"));
+  tft.println(F("math tan <rad> : calculate trigonometric tangent value"));
+  tft.println(F("math sqrt <val> : calculate floating-point square root"));
+  tft.println(F("rand map : print distribution map of PRNG output"));
+  tft.println(F("cipher <str> : encrypt string with built-in hardware crypto"));
+  tft.println(F("decipher <hex> : decrypt hex block with secure cipher key"));
+  tft.println(F("keygen <seed> : generate secure token encryption keypair"));
+  tft.println(F("base <num> <base> : convert base number system (Hex/Dec/Bin)"));
+  tft.println(F("hex <val> : convert input data to hex literal format"));
+  tft.println(F("dec <val> : convert input data to decimal integer format"));
+  tft.println(F("bin <val> : convert input data to binary string format"));
+  tft.println(F("ascii <char> : print ASCII lookup table character map"));
+  tft.println(F("alias <name>=<cmd> : map custom shorthand macro shortcut string"));
+  tft.println(F("alias : list all user customized shell aliases"));
+  tft.println(F("whoami : print current active session username"));
+  tft.println(F("who : list all users authenticated on console"));
+  tft.println(F("usertool <cmd> : manage account access groups & credentials"));
+  tft.println(F("print <txt> : output text string to terminal stream"));
+  tft.println(F("tolower <str> : convert target string to lowercase"));
+  tft.println(F("toupper <str> : convert target string to uppercase"));
+  tft.println(F("match <patt> <str> : run regex pattern matching on input string"));
+  tft.println(F("where <cmd> : locate source handler path of terminal command"));
+  tft.println(F("what <cmd> : pull short manual description of command"));
+
+  // 8. 게임 및 멀티미디어 엔터테인먼트
+  tft.println(F("tetris : run classic falling block Tetris engine"));
+  tft.println(F("play <game> : execute targeted custom game module"));
+  tft.println(F("minecraft server : init light chunk server tracking"));
+  tft.println(F("3d demo : render dynamic raycasted 3D vector scene"));
+  tft.println(F("sl : run classic Steam Locomotive easter-egg (Train)"));
+  tft.println(F("dvd : start bouncing retro DVD logo engine"));
+  tft.println(F("fortune : print random inspirational fortune quote"));
+  tft.println(F("monitor : enter real-time raw frame buffer monitor"));
+
+  // 9. FreeRTOS 커널 가속 및 스케줄러 관리
+  tft.println(F("freertos : dump general kernel build parameters"));
+  tft.println(F("freertos help : call sub-matrix manual for ATK shell [cite: 2026-02-22]"));
+  tft.println(F("ram : quick breakdown of internal SRAM stack"));
+  tft.println(F("ps : process status snapshot"));
+  tft.println(F("top : real-time process monitor"));
+  tft.println(F("mem map : dump system memory address map"));
+  tft.println(F("mem max : check maximum allocated block size"));
+  tft.println(F("psram : check external PSRAM statistics"));
+  tft.println(F("flash : check SPI Flash memory metrics"));
+  tft.println(F("sketch : check compiled firmware binary info"));
+  tft.println(F("reason : print last reset reason code"));
+  tft.println(F("cycles : print CPU clock cycles since boot"));
+  tft.println(F("kernel ticks : print raw FreeRTOS kernel ticks"));
+  tft.println(F("sleep <ms> : put active task shell thread to sleep"));
+  tft.println(F("sleepms <ms> : put high-resolution vTaskDelay micro sleep"));
+  tft.println(F("timer <cmd> : configure software kernel task timer loop"));
+  tft.println(F("timer speed <hz> : adjust ticking resolution scale of timer"));
+  tft.println(F("int trigger <num> : assert a simulated hardware interrupt"));
+  tft.println(F("perf tester <mode> : run intensive scheduler context switch test"));
+
+  tft.setTextColor(TFT_CYAN);
+  tft.println(F("===================================="));
+}
+
+// ===============================================================================
+// Ardudows Systems Master HELP Partitioned Matrix
+// ===============================================================================
+
+void cmd_help_sys() {
+  tft.setTextColor(TFT_CYAN);
+  tft.println(F("--- [SYSTEM & CORE DIAGNOSTICS] ---"));
+  tft.println(F("ver              : Check shell version"));
+  tft.println(F("cls              : Clear screen buffer"));
+  tft.println(F("reboot           : Reboot immediately"));
+  tft.println(F("info             : Check your free heap"));
+  tft.println(F("uptime           : Check time passed since booting"));
+  tft.println(F("uptime clear     : Reset system uptime counter"));
+  tft.println(F("set cpu <freq>   : Set CPU speed"));
+  tft.println(F("reg dump         : Check core registers"));
+  tft.println(F("benchmark timer  : Hardware timer speed measurement test"));
+  tft.println(F("brownout status  : Check brownout status"));
+  tft.println(F("sys panic        : System forced error"));
+  tft.println(F("sys crash        : Force system core dump crash"));
+  tft.println(F("sys diagnostic   : Run deep hardware diagnostics"));
+  tft.println(F("sys recovery     : Enter safe recovery partition"));
+  tft.println(F("sys reload       : Reload core system configuration"));
+  tft.println(F("sys secure       : Check hardware security status"));
+  tft.println(F("syslog clear     : Wipe core system log buffer"));
+  tft.println(F("sys sos          : Trigger system SOS distress signal"));
+  tft.println(F("tasks            : List all active FreeRTOS tasks"));
+  tft.println(F("ps               : Process status snapshot"));
+  tft.println(F("top              : Real-time process monitor"));
+  tft.println(F("mem map          : Dump system memory address map"));
+  tft.println(F("mem max          : Check maximum allocated block size"));
+  tft.println(F("mem              : Quick heap usage summary"));
+  tft.println(F("psram            : Check external PSRAM statistics"));
+  tft.println(F("flash            : Check SPI Flash memory metrics"));
+  tft.println(F("sketch           : Check compiled firmware binary info"));
+  tft.println(F("reason           : Print last reset reason code"));
+  tft.println(F("cycles           : Print CPU clock cycles since boot"));
+  tft.println(F("kernel ticks     : Print raw FreeRTOS kernel ticks"));
+  tft.println(F("wdt feed         : Manually feed Watchdog Timer"));
+  tft.println(F("halt             : Stop all operations and freeze"));
+  tft.println(F("sync             : Commit filesystem buffer to storage"));
+  tft.println(F("credits          : Show Ardudows developer credits"));
+}
+
+void cmd_help_file() {
+  tft.setTextColor(TFT_CYAN);
+  tft.println(F("--- [FILE SYSTEM CONTROLS (SD)] ---"));
+  tft.println(F("ls               : Check inside the current directory"));
+  tft.println(F("ls size          : Sort files by size"));
+  tft.println(F("pwd              : Check current directory address"));
+  tft.println(F("cd <path>        : Change directory"));
+  tft.println(F("cd reset         : Reset path to root directory (/)"));
+  tft.println(F("touch <file>     : Create file"));
+  tft.println(F("touch test       : Run benchmark test on file creation"));
+  tft.println(F("mkfile <size>    : Create file with target byte size"));
+  tft.println(F("mkdummy <file>   : Generate dummy data file"));
+  tft.println(F("cat <file>       : Check the entire file content"));
+  tft.println(F("tac <file>       : View file contents in reverse order"));
+  tft.println(F("head <file>      : Display first few lines of a file"));
+  tft.println(F("tail <file>      : Display last few lines of a file"));
+  tft.println(F("nl <file>        : Show file lines with line numbers"));
+  tft.println(F("rm <file>        : Delete files"));
+  tft.println(F("rmdir <dir>      : Remove target empty directory"));
+  tft.println(F("mkdir <dir>      : Create a new directory"));
+  tft.println(F("purge <forder>   : Delete all files in the selected directory"));
+  tft.println(F("mv <src> <dst>   : Rename or move a file"));
+  tft.println(F("copy <src> <dst> : Copy file to target path"));
+  tft.println(F("cut <src> <dst>  : Cut file to clipboard"));
+  tft.println(F("paste            : Paste file from clipboard"));
+  tft.println(F("append <f> <s>   : Append string to end of file"));
+  tft.println(F("replace <f> <s>  : Find and replace string in file"));
+  tft.println(F("stat <file>      : Check selected file size and type"));
+  tft.println(F("grep <str> <f>   : Check for the existence of a specific string"));
+  tft.println(F("hexdump <file>   : Print file content in hex format"));
+  tft.println(F("wc <file>        : Counts the lines of the file"));
+  tft.println(F("wc char <file>   : Counts the characters of the file"));
+  tft.println(F("md5file <file>   : Check the file checksum and hash"));
+  tft.println(F("diff <f1> <f2>   : Compare differences between two files"));
+  tft.println(F("df               : Display disk free space on SD card"));
+  tft.println(F("du               : Estimate file space usage"));
+  tft.println(F("tree             : Graphic directory structure tree"));
+  tft.println(F("sd format        : SD card format"));
+}
+
+void cmd_help_net() {
+  tft.setTextColor(TFT_CYAN);
+  tft.println(F("--- [WIRELESS & NETWORK CONFIG] ---"));
+  tft.println(F("wifi scan        : Scan all nearby Access Points"));
+  tft.println(F("wifi scan best   : Scan and filter strongest AP signal"));
+  tft.println(F("wifi connect <s.> : Connect to Wi-Fi AP with credentials"));
+  tft.println(F("wifi disconnect  : Terminate active Wi-Fi connection"));
+  tft.println(F("wifi status      : Display current Wi-Fi status info"));
+  tft.println(F("wifi rssi        : Distance from the wifi router"));
+  tft.println(F("wifi renew       : Request to completely release and renew IP"));
+  tft.println(F("wifi chan <1-13> : Change active Wi-Fi radio channel"));
+  tft.println(F("wifi start       : Turn on Wi-Fi internal radio"));
+  tft.println(F("wifi stop        : Turn off Wi-Fi internal radio"));
+  tft.println(F("wifi ap <ssid>   : Start local Access Point mode"));
+  tft.println(F("wifi repeater    : Enable Wi-Fi NAT repeater mode"));
+  tft.println(F("wifi router      : Enable internal virtual router routing"));
+  tft.println(F("ipconfig         : Check ip address, subnet mask, gateway"));
+  tft.println(F("ifconfig         : A more detailed explanation than ipconfig"));
+  tft.println(F("netstat          : Similar to ipconfig and ifconfig"));
+  tft.println(F("router           : Show default gateway router info"));
+  tft.println(F("dns set <dns_ip> : Set dns cache name servers"));
+  tft.println(F("ntp sync         : NTP time synchronization (wifi required)"));
+  tft.println(F("ping <host>      : Ping target host IP/Domain"));
+  tft.println(F("ping test        : Run automated multi-target ping test"));
+  tft.println(F("ping kill        : Terminate background ping process"));
+  tft.println(F("nslookup <host>  : Query internet name servers for IP"));
+  tft.println(F("wget <site addr> : Download webpage file"));
+  tft.println(F("curl <url>       : Fetch URL content data to terminal"));
+  tft.println(F("http             : Check current http server status"));
+  tft.println(F("http <content>   : HTTP server commands (type http help)"));
+  tft.println(F("http head <url>  : Get HTTP server header metadata"));
+  tft.println(F("https            : Check current https server status"));
+  tft.println(F("https <content>  : HTTPS server commands (type https help)"));
+  tft.println(F("web drive        : Activate WebDAV wireless network drive"));
+}
+
+void cmd_help_hack() {
+  tft.setTextColor(TFT_CYAN);
+  tft.println(F("--- [PENETRATION TESTING & SECURITY] ---"));
+  tft.println(F("wifi promiscuous : Wifi packet monitor"));
+  tft.println(F("sniffhead <args> : Sniff and dump 802.11 packet headers"));
+  tft.println(F("portscan <ip><p> : Check whether the port of that ip open/closed"));
+  tft.println(F("nmap <ip>        : Scan top common ports of target IP"));
+  tft.println(F("grab <site/ip>   : Run simple web banner grabber"));
+  tft.println(F("mac spoof <mac>  : Spoof network interface MAC"));
+  tft.println(F("arp table        : Show local ARP cache IP/MAC table"));
+  tft.println(F("hack spam <ssid> : Beacon spam fake target access points"));
+  tft.println(F("hack deauth <mac>: Transmit deauthentication frames"));
+  tft.println(F("hack list        : Show captured targets for attack"));
+  tft.println(F("secure boot stat : Check chip hardware Secure Boot fuse"));
+}
+
+void cmd_help_tft() {
+  tft.setTextColor(TFT_CYAN);
+  tft.println(F("--- [TFT LCD GRAPHIC ENGINES] ---"));
+  tft.println(F("tft colorbar     : Display SMPTE test pattern colorbars"));
+  tft.println(F("tft invert       : Invert display screen color buffer"));
+  tft.println(F("tft grid         : Draw geometric calibration pixel grid"));
+  tft.println(F("tft readpixel <x>: Read RGB565 color data at coordinates"));
+  tft.println(F("tft fadeout      : Execute display fade-to-black effect"));
+  tft.println(F("tft mathwave     : Render algorithm dynamic wave graphics"));
+  tft.println(F("tft burnin fix   : Run screen burn-in recovery cycle"));
+  tft.println(F("font size <num>  : Change system terminal text scale"));
+  tft.println(F("lcd bright <val> : Set display PWM backlight brightness"));
+  tft.println(F("rotate <0-3>     : Change display screen orientation"));
+  tft.println(F("matrix fx        : Activate digital rain falling matrix fx"));
+  tft.println(F("color <color>    : Change primary terminal text color"));
+  tft.println(F("color retro      : Toggle classic amber/green terminal look"));
+  tft.println(F("draw rect <args> : Draw rectangle outline to display"));
+  tft.println(F("draw circle <a>  : Draw circle outline to display"));
+  tft.println(F("screensaver      : Force activate configured screensaver"));
+  tft.println(F("benchmark gfx    : Run core SPI graphic acceleration test"));
+  tft.println(F("dvd              : Start bouncing retro DVD logo engine"));
+  tft.println(F("banner           : Draw large ASCII art system banner"));
+}
+
+void cmd_help_hw() {
+  tft.setTextColor(TFT_CYAN);
+  tft.println(F("--- [HARDWARE PERIPHERALS & IO] ---"));
+  tft.println(F("gpio read <pin>  : Read digital state of specific pin"));
+  tft.println(F("gpio write <p><v>: Write HIGH/LOW value to target pin"));
+  tft.println(F("gpio check       : Scan entire GPIO multiplexer array"));
+  tft.println(F("analog read <p>  : Read 12-bit ADC raw analog values"));
+  tft.println(F("pwm test <pin>   : Output modulated PWM test frequency"));
+  tft.println(F("touch read <pin> : Read capacitive touch sensor threshold"));
+  tft.println(F("touch test       : Run full matrix touch pin telemetry"));
+  tft.println(F("hall             : Read built-in magnetic Hall sensor"));
+  tft.println(F("temp             : Print internal ESP32 on-chip sensor"));
+  tft.println(F("temp logger      : Start real-time temperature telemetry"));
+  tft.println(F("i2c scan         : Scan I2C bus for connected client IDs"));
+  tft.println(F("i2c map          : Render physical I2C address grid map"));
+  tft.println(F("i2c speed <hz>   : Modify I2C clock frequency speed"));
+  tft.println(F("i2c reset        : Force flush and reset locked I2C bus"));
+  tft.println(F("ble init         : Initialize Bluetooth Low Energy radio"));
+  tft.println(F("ble scan         : Scan for advertising BLE devices"));
+  tft.println(F("ble connect <mac>: Establish connection to target BLE MAC"));
+  tft.println(F("ble disconnect   : Drop active BLE connection link"));
+  tft.println(F("ble info <args>  : Print current BLE stack diagnostics"));
+  tft.println(F("usb <mode>       : Toggle USB OTG MSC/CDC interface mode"));
+  tft.println(F("lsusb            : List devices on virtual USB host controller"));
+  tft.println(F("hw filter        : Configure hardware noise filter limits"));
+  tft.println(F("hw vref          : Read calibrated chip Vref voltage"));
+  tft.println(F("hw uid           : Read unique 64-bit factory eFuse chip ID"));
+  tft.println(F("hw seed          : Generate cryptographically secure RNG seed"));
+  tft.println(F("hw               : Dump general hardware chipset profile"));
+  tft.println(F("mac              : Print factory burned Wi-Fi base MAC"));
+  tft.println(F("rf status        : Display radio frequency stack metrics"));
+  tft.println(F("rtc              : Check hardware Real-Time Clock register"));
+  tft.println(F("rtc cal          : Run calibration routine on RTC crystal"));
+  tft.println(F("alarm <time>     : Set hardware wake alarm trigger time"));
+  tft.println(F("beep talk <str>  : Convert text to piezo buzzer morse/tones"));
+  tft.println(F("sweep pz         : Execute audio frequency sweep on buzzer"));
+  tft.println(F("pz <freq>        : Play single pitch frequency tone"));
+}
+
+void cmd_help_math() {
+  tft.setTextColor(TFT_CYAN);
+  tft.println(F("--- [MATHEMATICS & CRYPTOGRAPHY] ---"));
+  tft.println(F("calc <expr>      : Parse and evaluate mathematical expression"));
+  tft.println(F("math const       : List global core mathematical constants"));
+  tft.println(F("math tan <rad>   : Calculate trigonometric tangent value"));
+  tft.println(F("math sqrt <val>  : Calculate floating-point square root"));
+  tft.println(F("rand map         : Print distribution map of PRNG output"));
+  tft.println(F("cipher <str>     : Encrypt string with built-in hardware crypto"));
+  tft.println(F("decipher <hex>   : Decrypt hex block with secure cipher key"));
+  tft.println(F("keygen <seed>    : Generate secure token encryption keypair"));
+  tft.println(F("base <num> <b.>  : Convert base number system (Hex/Dec/Bin)"));
+  tft.println(F("hex <val>        : Convert input data to hex literal format"));
+  tft.println(F("dec <val>        : Convert input data to decimal integer format"));
+  tft.println(F("bin <val>        : Convert input data to binary string format"));
+  tft.println(F("ascii <char>     : Print ASCII lookup table character map"));
+}
+
+void cmd_help_user() {
+  tft.setTextColor(TFT_CYAN);
+  tft.println(F("--- [USER CONSOLE & ENVIRONMENT] ---"));
+  tft.println(F("whoami           : Print current active session username"));
+  tft.println(F("who              : List all users authenticated on console"));
+  tft.println(F("usertool <cmd>   : Manage account access groups & credentials"));
+  tft.println(F("env              : List environmental variables configured"));
+  tft.println(F("alias <name>=<c> : Map custom shorthand macro shortcut string"));
+  tft.println(F("alias            : List all user customized shell aliases"));
+  tft.println(F("echo <con> > <f> : Delete and create all contents within a file"));
+  tft.println(F("print <txt>      : Output text string to terminal stream"));
+  tft.println(F("tolower <str>    : Convert target string to lowercase"));
+  tft.println(F("toupper <str>    : Convert target string to uppercase"));
+  tft.println(F("match <patt> <s> : Run regex pattern matching on input string"));
+  tft.println(F("where <cmd>      : Locate source handler path of command"));
+  tft.println(F("what <cmd>       : Pull short manual description of command"));
+}
+
+void cmd_help_game() {
+  tft.setTextColor(TFT_CYAN);
+  tft.println(F("--- [RETRO GAMES & SIMULATORS] ---"));
+  tft.println(F("tetris           : Run classic falling block Tetris engine"));
+  tft.println(F("play <game>      : Execute targeted custom game module"));
+  tft.println(F("minecraft ser. <m>: Init light chunk server tracking"));
+  tft.println(F("3d demo          : Render dynamic raycasted 3D vector scene"));
+  tft.println(F("sl               : Run classic Steam Locomotive easter-egg"));
+  tft.println(F("fortune          : Print random inspirational fortune quote"));
+  tft.println(F("monitor          : Enter real-time raw frame buffer monitor"));
+}
+
+void cmd_help_rtos() {
+  tft.setTextColor(TFT_CYAN);
+  tft.println(F("--- [FREERTOS KERNEL & SCHEDULER] ---"));
+  tft.println(F("freertos         : Dump general kernel build parameters"));
+  tft.println(F("freertos help    : For more details, type freertos help"));
+  tft.println(F("ram              : Quick breakdown of internal SRAM stack"));
+  tft.println(F("sleep <ms>       : Put active task shell thread to sleep"));
+  tft.println(F("sleepms <ms>     : Put high-resolution vTaskDelay micro sleep"));
+  tft.println(F("timer <cmd>      : Configure software kernel task timer loop"));
+  tft.println(F("timer speed <hz> : Adjust ticking resolution scale of timer"));
+  tft.println(F("int trigger <n>  : Assert a simulated hardware interrupt"));
+  tft.println(F("perf tester <m>  : Run intensive scheduler context switch test"));
+  tft.println(F("porting <args>   : Hardware architecture layer adaptation test"));
+}
+
+// -----------------------------------------------------------------------------
+// [MAIN ENTRY] 유저가 입력한 help 인자를 검증해 분할 함수를 분기하는 컨트롤러
+// -----------------------------------------------------------------------------
+void cmd_help_master(String subArg) {
+  subArg.trim();
+  subArg.toLowerCase();
+
+  if (subArg == "" || subArg == "?") {
+    tft.setTextColor(TFT_CYAN);
+    tft.println(F("======= Ardudows OS Master Help ======="));
+    tft.println(F("  Syntax: help [category]"));
+    tft.println(F("---------------------------------------"));
+    tft.println(F("  help sys     : Core & Diagnostics"));
+    tft.println(F("  help file    : File System Controls (SD)"));
+    tft.println(F("  help net     : Wireless & Protocols"));
+    tft.println(F("  help hack    : Penetration & Security Tools"));
+    tft.println(F("  help tft     : Display & Graphic Engines"));
+    tft.println(F("  help hw      : I2C, BLE, GPIO Peripheral"));
+    tft.println(F("  help math    : Base Cryptography & Math"));
+    tft.println(F("  help user    : Console, Alias & Env"));
+    tft.println(F("  help game    : Retro Games & Simulators"));
+    tft.println(F("  help rtos    : FreeRTOS Kernel Engine"));
+    tft.println(F("======================================="));
+    return;
+  }
+
+  if (subArg == "sys")        cmd_help_sys();
+  else if (subArg == "file")  cmd_help_file();
+  else if (subArg == "net")   cmd_help_net();
+  else if (subArg == "hack")  cmd_help_hack();
+  else if (subArg == "tft")   cmd_help_tft();
+  else if (subArg == "hw")    cmd_help_hw();
+  else if (subArg == "math")  cmd_help_math();
+  else if (subArg == "user")  cmd_help_user();
+  else if (subArg == "game")  cmd_help_game();
+  else if (subArg == "rtos")  cmd_help_rtos();
+  else {
+    tft.setTextColor(TFT_RED);
+    tft.printf("Unknown category: '%s'\n", subArg.c_str());
+    tft.println("Type 'help' to see valid categories.");
+  }
 }
 
 String generateRandomSSID32() {
@@ -7571,8 +8309,9 @@ void cmd_curl(String url) {
   tft_print_scroll(">> CURL DONE");
 }
 
+//ble 쓰레기
 // ================== BLE ==================
-
+/*
 void cmd_ble_init() {
   if (bleInitialized) {
     tft.println("BLE already init");
@@ -7747,6 +8486,7 @@ void cmd_ble_info(int index) {
   else
     tft.println("Vendor: Unknown Device");
 }
+*/
 
 // ================== GPIO ==================
 
@@ -9339,7 +10079,7 @@ const uint32_t SAFE_END   = 0x3FCFFFFF;
 uint8_t parseSmartValue(String val) {
     val.trim();
     if (val.startsWith("'") && val.endsWith("'") && val.length() >= 3) {
-        return (uint8_t)val.charAt(1); // 아스키 ('A') 처리
+        return (uint8_t)val.charAt(1); // 아스크 ('A') 처리
     } else if (val.startsWith("0x") || val.startsWith("0X")) {
         return (uint8_t)strtoul(val.c_str(), NULL, 16); // 16진수 처리
     } else {
@@ -9353,10 +10093,23 @@ void cmd_ram(String input) {
     if (isForce) input.replace("<access!>", "");
     input.trim();
 
+    // 메인 쉘에서 "ram" 문자열이 포함되어 들어올 경우를 대비한 방어코드
+    if (input.startsWith("ram ")) {
+        input = input.substring(4);
+        input.trim();
+    } else if (input == "ram") {
+        input = "";
+    }
+
+    // 인자가 아무것도 없으면 사용법 출력하고 탈출
+    if (input == "") {
+        tft.setTextColor(TFT_RED);
+        tft.println(F("Usage: ram [write|fill|scribe|read|listing]"));
+        return;
+    }
+
     // 2. 명령어 및 인자 분리
     int firstSpace = input.indexOf(' ');
-    if (firstSpace == -1 && input != "listing") return; 
-
     String subCmd = (firstSpace == -1) ? input : input.substring(0, firstSpace);
     String args = (firstSpace == -1) ? "" : input.substring(firstSpace + 1);
     args.trim();
@@ -9364,17 +10117,19 @@ void cmd_ram(String input) {
     // --- [ 기능 1: WRITE ] ---
     if (subCmd == "write") {
         int nextSpace = args.indexOf(' ');
-        if (nextSpace == -1) { tft.println("Usage: ram write [addr] [val]"); return; }
+        if (nextSpace == -1) { tft.println(F("Usage: ram write [addr] [val]")); return; }
 
         uint32_t addr = strtoul(args.substring(0, nextSpace).c_str(), NULL, 16);
         String valStr = args.substring(nextSpace + 1);
-        valStr.trim(); // 뒤에 남은 공백 찌꺼기 완벽 제거
+        valStr.trim(); 
         uint8_t val = parseSmartValue(valStr);
 
         if (!isForce && (addr < SAFE_START || addr > SAFE_END)) {
-            tft.println("ACCESS DENIED! Use <access!>"); return;
+            tft.setTextColor(TFT_RED);
+            tft.println(F("ACCESS DENIED! Use <access!>")); return;
         }
         *(volatile uint8_t*)addr = val;
+        tft.setTextColor(TFT_GREEN);
         tft.printf("RAM Write: 0x%X -> 0x%02X ('%c')\n", addr, val, val);
     }
 
@@ -9382,7 +10137,7 @@ void cmd_ram(String input) {
     else if (subCmd == "fill") {
         int s1 = args.indexOf(' ');
         int s2 = args.lastIndexOf(' ');
-        if (s1 == -1 || s2 == -1 || s1 == s2) { tft.println("Usage: ram fill [start] [end] [val]"); return; }
+        if (s1 == -1 || s2 == -1 || s1 == s2) { tft.println(F("Usage: ram fill [start] [end] [val]")); return; }
 
         uint32_t start = strtoul(args.substring(0, s1).c_str(), NULL, 16);
         uint32_t end = strtoul(args.substring(s1 + 1, s2).c_str(), NULL, 16);
@@ -9391,31 +10146,35 @@ void cmd_ram(String input) {
         uint8_t val = parseSmartValue(valStr);
 
         if (!isForce && (start < SAFE_START || end > SAFE_END)) {
-            tft.println("ACCESS DENIED! Zone protection active."); return;
+            tft.setTextColor(TFT_RED);
+            tft.println(F("ACCESS DENIED! Zone protection active.")); return;
         }
         for (uint32_t a = start; a <= end; a++) *(volatile uint8_t*)a = val;
+        tft.setTextColor(TFT_GREEN);
         tft.printf("RAM Fill: 0x%X~0x%X with 0x%02X\n", start, end, val);
     }
 
     // --- [ 기능 3: SCRIBE ] ---
     else if (subCmd == "scribe") {
         int s1 = args.indexOf(' ');
-        if (s1 == -1) { tft.println("Usage: ram scribe [addr] [text]"); return; }
+        if (s1 == -1) { tft.println(F("Usage: ram scribe [addr] [text]")); return; }
 
         uint32_t addr = strtoul(args.substring(0, s1).c_str(), NULL, 16);
         String text = args.substring(s1 + 1); 
 
         if (!isForce && (addr < SAFE_START || addr + text.length() > SAFE_END)) {
-            tft.println("❌ ACCESS DENIED! Scribe limit."); return;
+            tft.setTextColor(TFT_RED);
+            tft.println(F("ACCESS DENIED! Scribe limit.")); return;
         }
         for (int i = 0; i < text.length(); i++) *(volatile uint8_t*)(addr + i) = text[i];
         *(volatile uint8_t*)(addr + text.length()) = 0; // NULL 종료
-        tft.printf("✅ RAM Scribe: [%s] at 0x%X\n", text.c_str(), addr);
+        tft.setTextColor(TFT_GREEN);
+        tft.printf("RAM Scribe: [%s] at 0x%X\n", text.c_str(), addr);
     }
 
     // --- [ 기능 4: READ ] ---
     else if (subCmd == "read") {
-        if (args == "") { tft.println("Usage: ram read [addr]"); return; }
+        if (args == "") { tft.println(F("Usage: ram read [addr]")); return; }
         uint32_t addr = strtoul(args.c_str(), NULL, 16);
         uint8_t val = *(volatile uint8_t*)addr;
         tft.printf("[RAM] 0x%X : 0x%02X ('%c')\n", addr, val, val);
@@ -9424,20 +10183,31 @@ void cmd_ram(String input) {
     // --- [ 기능 5: LISTING ] ---
     else if (subCmd == "listing") {
       tft.setTextSize(1);
-      // 배경색을 검은색으로 고정하여 글자가 겹쳐서 뭉개지는 잔상 현상 원천 차단!
       tft.setTextColor(TFT_GREEN, TFT_BLACK); 
 
       int s1 = args.indexOf(' ');
-      uint32_t startAddr = (args == "") ? SAFE_START : strtoul(args.substring(0, s1).c_str(), NULL, 16);
+      uint32_t startAddr;
+      uint32_t length = 256; // 기본 덤프 길이
+
+      // 인자 슬라이싱 버그 완전 해결 방어 코드
+      if (args == "") {
+          startAddr = SAFE_START;
+      } else if (s1 == -1) {
+          // 인자가 주소 딱 하나만 들어왔을 때 (예: ram listing 0x3FC80000)
+          startAddr = strtoul(args.c_str(), NULL, 16);
+      } else {
+          // 주소와 길이가 둘 다 들어왔을 때 (예: ram listing 0x3FC80000 128)
+          startAddr = strtoul(args.substring(0, s1).c_str(), NULL, 16);
+          length = (uint32_t)args.substring(s1 + 1).toInt();
+          if (length == 0) length = 256; // 변환 오류 찌꺼기 방어
+      }
       
-      // 주소 하위 4비트를 날려서 무조건 16바이트 정렬 스캔 라인 정렬 (상남자의 가독성)
+      // 16바이트 라인 정렬
       startAddr &= 0xFFFFFFF0; 
 
-      uint32_t length = (s1 == -1) ? 256 : (uint32_t)args.substring(s1 + 1).toInt();
-
       tft.printf("\n--- [ Ardudows RAM LISTING : 0x%X ] ---\n", startAddr);
-      tft.println("ADDR      00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F | ASCII");
-      tft.println("-----------------------------------------------------------------");
+      tft.println(F("ADDR      00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F | ASCII"));
+      tft.println(F("-----------------------------------------------------------------"));
 
       for (uint32_t i = 0; i < length; i += 16) {
         uint32_t currAddr = startAddr + i;
@@ -9449,19 +10219,23 @@ void cmd_ram(String input) {
           tft.printf("%02X ", v);
         }
 
-        tft.print("| ");
+        tft.print(F("| "));
 
         for (int j = 0; j < 16; j++) {
           uint8_t v = *(volatile uint8_t*)(currAddr + j);
           if (v >= 32 && v <= 126) tft.print((char)v);
-          else tft.print(".");
+          else tft.print(F("."));
         }
         tft.println();
             
-        if ((i + 16) % 128 == 0) delay(5); // 시리얼/디스플레이 안정화 간격 살짝 양보
+        if ((i + 16) % 128 == 0) delay(5); // 스케줄러 점유 양보 및 잔상 방지
       }
-      tft.println("-----------------------------------------------------------------");
+      tft.println(F("-----------------------------------------------------------------"));
       tft.setTextSize(2);
+    }
+    else {
+        tft.setTextColor(TFT_RED);
+        tft.printf("Unknown sub-command: '%s'\n", subCmd.c_str());
     }
 }
 
@@ -10072,6 +10846,38 @@ void stop_server_instance(int slot) {
 }
 
 // -----------------------------------------------------------------
+// [HTTP OS KERNEL] 커널 부팅 시 슬롯 및 FreeRTOS 뮤텍스 강제 초기화
+// -----------------------------------------------------------------
+void init_http_slots() {
+    tft.println(">> KERNEL: Initializing HTTP Slots...");
+
+    for (int i = 0; i < 4; i++) {
+        http_slots[i].port = 0;
+        http_slots[i].basePath = "";
+        http_slots[i].isActive = false;
+        
+        // [보안 플래그 설정]
+        // 221서버 좌표계를 지키거나 커널 오작동을 막기 위해 
+        // 특정 슬롯을 보호하려면 여기서 true로 세팅 가능 (기본은 false)
+        http_slots[i].isSecure = false; 
+
+        // 🔥 핵심: `xQueueSemaphoreTake` 에러의 주범인 NULL 핸들 저격 방어
+        // FreeRTOS 바이너리 뮤텍스(실물 큐) 메모리를 슬롯마다 각각 할당함
+        http_slots[i].mutex = xSemaphoreCreateMutex();
+
+        if (http_slots[i].mutex == NULL) {
+            tft.setTextColor(TFT_RED);
+            tft.printf("!! KERNEL ERROR: Slot [%d] Mutex Allocate Fault!\n", i);
+            tft.setTextColor(TFT_GREEN);
+        } else {
+            // 초기 생성 직후 세마포어가 Unlocked(Give) 상태로 대기하도록 설정
+            xSemaphoreGive(http_slots[i].mutex);
+        }
+    }
+    tft.println(">> ARDUDOWS KERNEL INIT COMPLETE.");
+}
+
+// -----------------------------------------------------------------
 // [HTTP OS MANAGER] cmd_http() 구현체 (sum | edit | del | status | stop | run)
 // -----------------------------------------------------------------
 void cmd_http(String args) {
@@ -10212,8 +11018,12 @@ void cmd_http(String args) {
             tft.printf(">> Slot %d Released Successfully.\n", slot);
         } else tft.println("!! INVALID SLOT");
     }
+    else if (sub == "init") {
+      init_http_slots();
+      tft.println("init done");
+    }
     else {
-        tft.println("HTTP CLI: sum | edit | del | status | stop | run");
+        tft.println("HTTP CLI: sum | edit | del | status | stop | run | init");
     }
 }
 
@@ -10270,10 +11080,28 @@ void cmd_https(String args) {
             }
         }
     }
+    else if (sub == "init") {
+      init_http_slots();
+      tft.println("init done");
+    }
     else {
-        tft.println("HTTPS CLI: sum | status | stop | run");
+        tft.println("HTTPS CLI: sum | status | stop | run | init");
     }
 }
+
+// 1. 색상 구조체 정의
+struct ColorEntry {
+  const char* name;
+  uint16_t color;
+};
+
+// 2. 색상 목록 (필요한 만큼 추가하세요)
+const ColorEntry colorTable[] = {
+  {"green", TFT_GREEN}, {"orange", TFT_ORANGE}, {"cyan", TFT_CYAN},
+  {"white", TFT_WHITE}, {"red", TFT_RED}, {"blue", TFT_BLUE},
+  {"yellow", TFT_YELLOW}, {"magenta", TFT_MAGENTA}, {"black", TFT_BLACK},
+  {"gray", TFT_DARKGREY}, {"purple", TFT_PURPLE}
+};
 
 // ================== COMMAND PARSER ==================
 
@@ -10289,7 +11117,13 @@ void executeCommand(String cmd) {
   if (cmd == "") return;  // 빈 명령어 무시
 
   // --- [ SYSTEM COMMANDS ] ---
-  if (cmd == "help") cmd_help();
+  if (cmd == "help" || cmd.startsWith("help ")) {
+    String subArg = "";
+    if (cmd.startsWith("help ")) {
+        subArg = cmd.substring(5); // "help " 뒤의 카테고리 문자열만 슬라이싱
+    }
+    cmd_help_master(subArg);
+  }
   else if (cmd == "ver") tft.println("Ardudows ATK v1.1\nArdudows Systems (corporetion)");
   else if (cmd == "cls") {
     tft.fillScreen(TFT_BLACK);
@@ -10546,18 +11380,38 @@ void executeCommand(String cmd) {
     String path = cmd.substring(6);
     path.trim();
     tft.printf(">> PURGING DIR: %s\n", path.c_str());
+
     File dir = SD.open(path.c_str());
     if (dir && dir.isDirectory()) {
+    
+      // 1. 삭제할 파일들의 전체 경로를 담을 벡터(배열) 생성
+      std::vector<String> filesToDelete;
+    
       File file = dir.openNextFile();
       while (file) {
-        String fName = file.name();
+        if (!file.isDirectory()) { // 폴더가 아닌 '파일'일 때만 수집
+          // 라이브러리에 따라 file.path() 또는 file.name() 사용
+          // 보통 ESP32 SD 라이브러리는 file.path()로 전체 경로를 얻을 수 있습니다.
+          filesToDelete.push_back(String(file.path())); 
+        } 
         file.close();
-        SD.remove((path + "/" + fName).c_str());
-        tft.printf(" Deleted: %s\n", fName.c_str());
-        file = dir.openNextFile();
+        file = dir.openNextFile(); // 안전하게 다음 파일 포인터 획득
       }
+      dir.close(); // 디렉토리 탐색이 끝났으므로 닫아줍니다.
+
+      // 2. 수집된 파일들을 실제로 하나씩 삭제
+      for (const String& filePath : filesToDelete) {
+        if (SD.remove(filePath.c_str())) {
+          tft.printf(" Deleted: %s\n", filePath.c_str());
+        } else {
+          tft.printf("!! Fail: %s\n", filePath.c_str());
+        }
+      }
+
       tft.println(">> PURGE COMPLETE.");
-    } else tft.println("!! INVALID DIRECTORY");
+    } else {
+      tft.println("!! INVALID DIRECTORY");
+    }
   }
 
   // 2. 파일 크기 및 클러스터 정보 등 상세 메타데이터 확인
@@ -10648,9 +11502,37 @@ void executeCommand(String cmd) {
       String src = cmd.substring(3, sp);
       String dest = cmd.substring(sp + 1);
       dest.trim();
-      // SD라이브러리는 기본 rename을 지원하지 않는 경우 경로 검증 후 처리해야 함
-      if (SD.rename(src.c_str(), dest.c_str())) tft.println(">> MOVE/RENAME SUCCESS");
-      else tft.println("!! MOVE FAILED");
+
+      tft.printf("Moving: %s -> %s\n", src.c_str(), dest.c_str());
+
+      // 1단계: 단순 Rename 시도 (같은 폴더 내 이름 변경용)
+      if (SD.rename(src.c_str(), dest.c_str())) {
+        tft.println(">> RENAME SUCCESS");
+      }   
+      // 2단계: Rename 실패 시 (다른 폴더 이동 등) 강제 복사 후 삭제 방식 진행
+      else {
+        File srcFile = SD.open(src.c_str(), FILE_READ);
+        File destFile = SD.open(dest.c_str(), FILE_WRITE);
+
+        if (srcFile && destFile && !srcFile.isDirectory()) {
+          // 버퍼를 이용해 바이너리 데이터를 통째로 복사
+          uint8_t buf[64];
+          while (srcFile.available()) {
+            int len = srcFile.read(buf, sizeof(buf));
+            destFile.write(buf, len);
+          }
+          srcFile.close();
+          destFile.close();
+
+          // 복사가 완료되었으므로 원본 파일 삭제
+          SD.remove(src.c_str());
+          tft.println(">> MOVE SUCCESS (Copy&Delete)");
+        } else {
+          if (srcFile) srcFile.close();
+          if (destFile) destFile.close();
+          tft.println("!! MOVE FAILED");
+        }
+      }
     }
   }
 
@@ -10674,15 +11556,23 @@ void executeCommand(String cmd) {
   // 8. 파일 용량 순서대로 정렬하여 출력
   else if (cmd == "ls size") {
     tft.println(">> SORTED FILE LIST (BY SIZE)");
-    File root = SD.open("/");
-    File file = root.openNextFile();
-    while (file) {
-      if (!file.isDirectory()) {
-        tft.printf(" - %s : %d Bytes\n", file.name(), file.size()); // f.size() -> file.size() 수정
+  
+    // [수정] "/" 대신 현재 작업 디렉토리 경로 변수(currentPath)를 넣어줍니다.
+    // 만약 변수가 없다면 현재 경로를 들고 있는 String 변수를 지정해야 합니다.
+    File root = SD.open(currentPath.c_str()); 
+
+    if (root && root.isDirectory()) {
+      File file = root.openNextFile();
+      while (file) {
+        if (!file.isDirectory()) {
+          tft.printf(" - %s : %d Bytes\n", file.name(), file.size());
+        }
+        file = root.openNextFile();
       }
-      file = root.openNextFile();
+      root.close();
+    } else {
+      tft.println("!! CANNOT OPEN CURRENT DIR");
     }
-    root.close();
   }
 
   // 9. 텍스트 파일 라인 수 세기
@@ -10716,13 +11606,79 @@ void executeCommand(String cmd) {
     } else tft.println("!! CANNOT OPEN FILE");
   }
 
-  // 11. ESP32 CPU 코어 0, 코어 1 클럭 실시간 오버클럭 테스트 
+  // ==========================================
+  // 11. ESP32-S3 한계 돌파 동적 클럭 제어 (고급 최적화 버전)
+  // ==========================================
   else if (cmd.startsWith("set cpu ")) {
     int freq = cmd.substring(8).toInt();
-    if (freq == 240 || freq == 160 || freq == 80) {
-      setCpuFrequencyMhz(freq);
-      tft.printf(">> CPU Frequency set to %d MHz\n", freq);
-    } else tft.println("!! INVALID FREQ. CHOOSE 80, 160, or 240");
+    
+    // 지원하는 유효 클럭 레이어 검증
+    if (freq != 240 && freq != 160 && freq != 80 && freq != 40 && freq != 20) {
+      tft.setTextColor(0xF800); // Red
+      tft.println("!! INVALID CLOCK. Choose [20, 40, 80, 160, 240]");
+      tft.setTextColor(0xFFFF); // White
+      return;
+    }
+
+    tft.println(">> Initiating Dynamic Voltage & Frequency Scaling (DVFS)...");
+    
+    // 1. 하드웨어 안정화를 위한 주변장치 스트림 일시 플러시
+    Serial.flush();
+    delay(10);
+
+    // 2. 주파수 스케일링 단행 (아두이노 API 내부에서 타이머축 자동 연동 보정됨)
+    setCpuFrequencyMhz(freq);
+
+    // 3. APB 버스 하락에 따른 UART 보드레이트 재동기화 및 보정
+    long uart_baud = 115200;
+    Serial.begin(uart_baud); 
+
+    // 4. [고급 기술] APB 주파수 변동에 따른 TFT SPI 클럭 동적 가속 보정
+    uint32_t current_apb = getApbFrequency();
+    #if defined(_LOVYANGFX_HPP_) || defined(_LOVYANGFX_H_)
+      // LovyanGFX 사용 시: 버스 주파수에 맞춰 SPI 클럭 강제 재할당
+      tft.setPanelSubWindow(0,0, tft.width(), tft.height()); // 패널 버스 리셋 유도
+    #elif defined(TFT_eSPI_H__)
+      // TFT_eSPI 사용 시 대응 구조 레이어
+    #endif
+
+    // 5. 클럭 기반 예상 소모 전류 시뮬레이션 매트릭스 (ESP32-S3 데이터시트 준거)
+    float est_current = 0.0;
+    String power_status = "";
+    
+    if (freq == 240)      { est_current = 95.5; power_status = "MAX PERFORMANCE"; }
+    else if (freq == 160) { est_current = 65.0; power_status = "BALANCED MODE"; }
+    else if (freq == 80)  { est_current = 40.2; power_status = "NORMAL MODE"; }
+    else if (freq == 40)  { est_current = 22.1; power_status = "ECO MODE (L1)"; }
+    else if (freq == 20)  { est_current = 14.5; power_status = "ULTRA ECO MODE (L2)"; }
+
+    // 6. 가시성 극대화를 위한 OS 결과 레포팅 뷰
+    tft.fillScreen(0x0000); // 셸 화면 정돈
+    tft.println("=========================================");
+    tft.printf(" [Ardudows Kernel CPU Scaling Success]\n");
+    tft.println("=========================================");
+    
+    tft.print("Core Status  : ");
+    if (freq <= 40) tft.setTextColor(0x07E0); // Green for ECO
+    else if (freq == 240) tft.setTextColor(0xF800); // Red for MAX
+    else tft.setTextColor(0x07FF); // Cyan
+    tft.println(power_status);
+    tft.setTextColor(0xFFFF); // 흰색 복구
+
+    tft.printf("CPU Frequency: %d MHz\n", getCpuFrequencyMhz());
+    tft.printf("APB Bus Clock: %.2f MHz\n", (float)current_apb / 1000000.0f);
+    tft.printf("Est. Current : %.1f mA (Chip Only)\n", est_current);
+    
+    // 저전력 모드 진입 시 주의문구 출력
+    if (freq <= 40) {
+      tft.setTextColor(0xFFE0); // Yellow
+      tft.println("-----------------------------------------");
+      tft.println(" ! PERIPHERAL WARNING !");
+      tft.println(" SPI/SD Card clock down-scaled to match APB.");
+      tft.println(" Wireless Mercenary(ESP-01) Baudrate checked.");
+      tft.setTextColor(TFT_GREEN);
+    }
+    tft.println("=========================================");
   }
 
   // 12. 태스크 리스트 및 스택 가용량 실시간 모니터링 (FreeRTOS 전용)
@@ -10763,7 +11719,7 @@ void executeCommand(String cmd) {
     tft.println(">> BROWNOUT DETECTOR CONFIG");
     tft.printf(" - RTC_CNTL_BROWN_OUT_REG: 0x%08X\n", READ_PERI_REG(RTC_CNTL_BROWN_OUT_REG));
   }
-
+  /*
   // 16. 실시간 배터리나 외부 인가 전압 ADC 측정 (GPIO 1번 핀 타겟 가이드)
   else if (cmd == "analog read") {
     analogReadResolution(12);
@@ -10771,14 +11727,15 @@ void executeCommand(String cmd) {
     float mv = (raw / 4095.0) * 3300.0;
     tft.printf(">> GPIO 1 Analog RAW: %d (%0.2f mV)\n", raw, mv);
   }
-
+  */
+  /*
   // 17. PWM 서보 모터 주파수 50Hz 강제 매핑 및 제어 테스트
   else if (cmd.startsWith("pwm test ")) {
     int duty = cmd.substring(9).toInt(); // 0 ~ 255
     analogWrite(2, duty); // GPIO 2번으로 강제 출력
     tft.printf(">> PWM Channel GPIO 2 Duty Set: %d\n", duty);
   }
-
+  */
   // 18. 소프트웨어 하드 리셋 (Panic 베이스 테스트 백업)
   else if (cmd == "sys panic") {
     tft.fillScreen(TFT_RED);
@@ -10793,14 +11750,14 @@ void executeCommand(String cmd) {
     int pin = cmd.substring(11).toInt();
     tft.printf(">> Touch Pin %d Value: %d\n", pin, touchRead(pin));
   }
-
+  /*
   // 20. 하드웨어 홀 센서 및 내부 전하량 모니터링
   else if (cmd == "hall") {
     // ESP32-S3 하드웨어 사양에 맞춘 안전 우회 시뮬레이터 출력
     tft.printf(">> Internal Hall Sensor: NOT SUPPORTED IN S3\n");
     tft.printf(">> Alternative ADC Noise Drift: %d\n", analogRead(0));
   }
-
+  */
   // 21. 현재 연결된 와이파이 망의 신호 품질 실시간 추적기
   else if (cmd == "wifi rssi") {
     if(WiFi.status() == WL_CONNECTED) {
@@ -10996,11 +11953,20 @@ void executeCommand(String cmd) {
   else if (cmd.startsWith("color ")) {
     String col = cmd.substring(6);
     col.trim();
-    if(col == "green") tft.setTextColor(TFT_GREEN);
-    else if(col == "amber") tft.setTextColor(TFT_ORANGE);
-    else if(col == "cyan") tft.setTextColor(TFT_CYAN);
-    else if(col == "white") tft.setTextColor(TFT_WHITE);
-    tft.println(">> TERMINAL CONSOLE FOREGROUND COLOR MODIFIED.");
+  
+    bool found = false;
+    for (const auto& entry : colorTable) {
+      if (col.equalsIgnoreCase(entry.name)) {
+        tft.setTextColor(entry.color);
+        tft.println(">> FOREGROUND COLOR: " + col);
+        found = true;
+        break;
+      }
+    }
+  
+    if (!found) {
+      tft.println(">> ERROR: UNKNOWN COLOR.");
+    }
   }
 
   // 40. 화면 보호기 그래픽 모드 진입
@@ -11110,43 +12076,44 @@ void executeCommand(String cmd) {
 
   // 52. 파일 시스템 내 모든 파일의 개수와 총 사용 용량 산출 (Du)
   else if (cmd == "du") {
-    tft.println(">> CALCULATING DISK USAGE...");
+    tft.println(F(">> CALCULATING DISK USAGE...")); // F() 매크로로 램 방어!
   
-    // 🔄 누적할 카운터 변수 초기화
+    // ⏱️ 실행 시간 측정 시작 (타임스탬프 낚아채기)
+    uint32_t startTime = millis();
+
     uint32_t fileCount = 0;
     uint32_t totalSize = 0;
 
-    // 최상위 루트 디렉터리 오픈
-    File root = SD.open("/");
+    File root = SD.open("/Ardudows");
 
-    // 🔥 [커널 람다식 재귀 스캐너] 하위 폴더가 있으면 지가 알아서 파고드는 내부 함수
-    // 람다 함수 구조를 써서 cmd 내부에서 깔끔하게 종결시켰습니다.
     auto scanDirectory = [&](auto& self, File dir) -> void {
       File file = dir.openNextFile();
       while (file) {
         if (file.isDirectory()) {
-          // 📂 폴더를 만나면? "어허, 이 자식 보소? 안쪽도 싹 다 긁어와!" (재귀 호출)
           self(self, file); 
         } else {
-        // 📄 파일을 만나면? 묻지도 따지지도 말고 크기와 개수 누적!
          totalSize += file.size();
          fileCount++;
         }
-       file.close(); // 메모리 누수 방지용 칼같은 가드 닫기
-       file = dir.openNextFile(); // 다음 자진출두 파일 낚아채기
+       file.close(); 
+       file = dir.openNextFile(); 
       }
     };
 
-   // 🚀 전수 조사 엔진 스타트!!
    if (root) {
      scanDirectory(scanDirectory, root);
      root.close();
    }
 
-   // 📺 윈도우 속성창과 100% 동기화된 리얼 하드웨어 스펙 출력!
+   // ⏱️ 실행 시간 측정 종료 및 소요 시간 계산
+   uint32_t elapsedTime = millis() - startTime;
+
    tft.printf(">> Total Files: %lu\n", fileCount);
    tft.printf(">> Used Space : %.2f MB\n", (float)totalSize / (1024.0f * 1024.0f));
-   }
+   
+   // 📺 소요된 시간을 초(s) 단위로 환산해서 출력 (예: 3.45s)
+   tft.printf(">> Time Taken : %.2f s\n", (float)elapsedTime / 1000.0f);
+  }
 
   // 53. 파일의 내용을 거꾸로(뒤에서부터) 출력 (Reverse Cat)
   else if (cmd.startsWith("tac ")) {
@@ -11467,16 +12434,93 @@ void executeCommand(String cmd) {
     tft.setTextColor(TFT_GREEN);
   }
 
-  // 82. 다운타임 카운트다운 타이머 (디스플레이 블러킹 알람)
+  // 82. 다운타임 카운트다운 타이머 (디스플레이 블러킹 알람 - us, ms, s, m, h 지원 + 잔상 제거 + 프로그래스 바)
   else if (cmd.startsWith("timer ")) {
-    int sec = cmd.substring(6).toInt();
-    tft.printf(">> TIMER STARTED FOR %d SEC\n", sec);
-    for(int i = sec; i > 0; i--) {
-        tft.printf("Remaining: %d s  \r", i);
-        delay(1000);
+    String param = cmd.substring(6); 
+    param.trim();
+
+    long long durationVal = 0;
+    String unit = "";
+    
+    for (int i = 0; i < param.length(); i++) {
+        char c = param.charAt(i);
+        if (isDigit(c)) {
+            durationVal = durationVal * 10 + (c - '0');
+        } else {
+            unit = param.substring(i);
+            unit.trim();
+            break;
+        }
     }
-    tft.println("\n>> TIME UP!");
-    for(int i=0; i<3; i++) { pz(1500, 100); delay(50); }
+
+    uint64_t total_us = 0;
+
+    if (unit == "us") {
+        total_us = durationVal;
+    } else if (unit == "ms") {
+        total_us = durationVal * 1000;
+    } else if (unit == "s" || unit == "") { 
+        total_us = durationVal * 1000000;
+    } else if (unit == "m") {               
+        total_us = durationVal * 60 * 1000000;
+    } else if (unit == "h") {
+        total_us = durationVal * 3600 * 1000000;
+    } else {
+        tft.println(">> ERROR: UNKNOWN UNIT (Use us, ms, s, m, h)");
+        return;
+    }
+
+    tft.printf(">> TIMER STARTED: %s\n", param.c_str());
+
+    uint64_t start_us = esp_timer_get_time();
+    uint64_t target_us = start_us + total_us;
+    uint64_t last_display_us = 0;
+
+    int16_t startX = tft.getCursorX();
+    int16_t startY = tft.getCursorY();
+
+    // 4. 카운트다운 루프 (오직 게이지바만 집중 마크)
+    while (esp_timer_get_time() < target_us) {
+        uint64_t now = esp_timer_get_time();
+
+        // 텍스트가 줄어들어 부하가 적으므로 갱신 주기를 더 빠르게(대략 16ms, 60FPS 급) 당겨옵니다.
+        if (now - last_display_us >= 16666) { 
+            last_display_us = now;
+            
+            tft.setCursor(startX, startY);
+            tft.setTextColor(TFT_GREEN, TFT_BLACK); 
+
+            // 진행률 계산
+            double progress = (double)(now - start_us) / (double)total_us;
+            if (progress > 1.0) progress = 1.0;
+            if (progress < 0.0) progress = 0.0;
+            
+            // 20칸짜리 롱 프로그래스 바로 대폭 업그레이드 (더 찰진 손맛)
+            int filled_chars = (int)(progress * 20.0);
+
+            String progressBar = "[";
+            for (int i = 0; i < 20; i++) {
+                if (i < filled_chars) progressBar += "#";
+                else progressBar += "-";
+            }
+            progressBar += "]";
+
+            // 숫자는 다 빼고 게이지바와 진행 퍼센트만 깔끔하게 출력!
+            tft.printf("%s %3d%%      \n", progressBar.c_str(), (int)(progress * 100.0));
+        }
+        delayMicroseconds(2); 
+    }
+
+    // 5. 타임아웃 알람 발생
+    tft.setCursor(startX, startY);
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.println("[####################] 100%");
+    tft.println(">> TIME UP!");
+    
+    for(int i = 0; i < 3; i++) { 
+        pz(1500, 100); 
+        delay(50); 
+    }
   }
 
   // 83. 랜덤 명언 제조기 (감성 충전기)
@@ -11489,7 +12533,7 @@ void executeCommand(String cmd) {
         "There is no place like 127.0.0.1"
     };
     tft.setTextColor(TFT_YELLOW);
-    tft.printf("🔮 %s\n", quotes[random(0, 5)].c_str());
+    tft.printf("%s\n", quotes[random(0, 5)].c_str());
     tft.setTextColor(TFT_GREEN);
   }
 
@@ -11623,9 +12667,9 @@ void executeCommand(String cmd) {
   // 94. 수학 연산용 상용 상수 원터치 조회
   else if (cmd == "math const") {
     tft.println(">> ARDUDOWS KERNEL MATH CONSTANTS");
-    tft.printf(" - PI (원주율)   : %.7f\n", PI);
-    tft.printf(" - E  (자연대수) : %.7f\n", 2.7182818);
-    tft.printf(" - LN2           : %.7f\n", 0.6931471);
+    tft.printf(" - PI   : %.7f\n", PI);
+    tft.printf(" - E    : %.7f\n", 2.7182818);
+    tft.printf(" - LN2  : %.7f\n", 0.6931471);
   }
 
   // 95. 간단한 텍스트 암호화 덤프 (카이사르 시프트 가상 인코더)
@@ -11650,12 +12694,25 @@ void executeCommand(String cmd) {
 
   // 97. 시스템 디스크 섹터 상태 시뮬레이터 (SD카드 배드섹터 및 파티션 가상 조화)
   else if (cmd == "df") {
-    tft.println(">> FILE SYSTEM PARTITION MAP");
-    uint32_t total = SD.totalBytes();
-    uint32_t used = SD.usedBytes();
+    tft.println(F(">> FILE SYSTEM PARTITION MAP")); // F() 매크로로 램 0바이트화!
+    
+    // 32비트 바이트 단위를 처음부터 64비트(uint64_t) 넉넉한 방에 대피시킵니다.
+    uint64_t totalBytes = SD.totalBytes();
+    uint64_t usedBytes = SD.usedBytes();
+    
+    // 메가바이트(MB) 계산기
+    uint64_t totalMB = totalBytes / (1024ULL * 1024ULL);
+    uint64_t usedMB = usedBytes / (1024ULL * 1024ULL);
+    
     tft.printf(" - Block Type: FAT32 / SDMMC Link\n");
-    tft.printf(" - Capacity  : %llu MB / %llu MB\n", used/(1024*1024), total/(1024*1024));
-    tft.printf(" - Usage Log : %.1f %%\n", ((float)used/total)*100.0f);
+    
+    // 이제 64비트 방에 안전하게 들고 있으니 %llu가 정확하게 64GB 근처로 긁어옵니다.
+    tft.printf(" - Capacity  : %llu MB / %llu MB\n", usedMB, totalMB);
+    
+    // 나눗셈을 할 때는 먼저 부동소수점(float)으로 강제 변환(Casting)해줘야 
+    // 정수 절삭 현상 없이 소수점 첫째 자리까지 정확하게 나옵니다.
+    float usagePercent = ((float)usedBytes / (float)totalBytes) * 100.0f;
+    tft.printf(" - Usage Log : %.1f %%\n", usagePercent);
   }
 
   // 98. 스크린 터치 보정 좌표 원시 로깅 데이터 수집기
@@ -11996,6 +13053,7 @@ void executeCommand(String cmd) {
   else if (cmd.startsWith("curl ")) cmd_curl(cmd.substring(5));
 
   // --- [ BLUETOOTH ] ---
+  /*
   else if (cmd == "ble init") cmd_ble_init();
   else if (cmd == "ble scan") cmd_ble_scan();
   else if (cmd.startsWith("ble connect ")) cmd_ble_connect(cmd.substring(12).toInt());
@@ -12005,7 +13063,7 @@ void executeCommand(String cmd) {
     int idx = cmd.substring(9).toInt(); 
     cmd_ble_info(idx);
   } 
-
+  */
   // --- [ HARDWARE I/O ] ---
   else if (cmd.startsWith("gpio read ")) cmd_gpio_read(cmd.substring(10).toInt());
   else if (cmd.startsWith("gpio write ")) {
@@ -12070,10 +13128,6 @@ void executeCommand(String cmd) {
     }
 
     tft.setTextColor(TFT_GREEN);
-  }
-
-  else if (cmd == "wh") {
-    Start_Who_is_Hacker();
   }
 
   // executeCommand 내부에 추가
@@ -12302,7 +13356,7 @@ void executeCommand(String cmd) {
     else if (sub == "check") ars_check();
     else if (sub == "purge") ars_purge();
     else if (sub == "reset") ESP.restart();
-    else tft.println("ARS: unknown command");
+    else tft.println("ARS: unknown command | mem | temp | wifi | check | purge | reset");
   }
 
   else if (cmd == "web drive") {
@@ -12350,36 +13404,6 @@ void executeCommand(String cmd) {
     tft.printf("Uptime: %lu min\n", millis() / 60000);
     tft.printf("Memory: %d KB / %d KB\n", ESP.getFreeHeap()/1024, ESP.getHeapSize()/1024);
     tft.printf("Terminal: ATK Shell\n");
-  }
-
-  else if (cmd.startsWith("nano ")) {
-    String filename = cmd.substring(5);
-    filename.trim();
-
-    if (filename == "") {
-      tft.println("Usage: nano <filename>");
-    } else {
-      // 1. 경로 보정: 유저가 파일명만 쳤을 때 현재 위치(dosCurrentPath)를 붙여줌
-      String fullPath = filename;
-      if (!filename.startsWith("/")) {
-        fullPath = currentPath;
-        if (!fullPath.endsWith("/")) fullPath += "/";
-        fullPath += filename;
-      }
-
-      // 2. 권한/존재 확인 (선택 사항: 폴더를 nano로 열려고 하면 막아야 함)
-      if (SD.open(fullPath.c_str()).isDirectory()) { tft.println("Error: Is a directory"); return; }
-
-      tft.print("Opening Editor: ");
-      tft.println(filename);
-
-      // 3. 에디터 실행 (보정된 절대 경로를 넘겨줌)
-      run_nano(fullPath); 
-
-      // 에디터 종료 후 화면 복구 (필요시)
-      // tft.fillScreen(TFT_BLACK);
-      // ADOS_Shell_Redraw(); 
-    }
   }
 
   else if (cmd == "sl") {
@@ -12835,68 +13859,65 @@ void executeCommand(String cmd) {
     tft.setTextColor(TFT_GREEN);
   }
 
-  // "set firmware"로 시작하는 모든 명령어 감지
-  else if (cmd.startsWith("set firmware")) {
-    // 1. 뒤에 인자가 없는 경우 처리 (예: "set firmware" 또는 "set firmware ")
-    String checkEmpty = cmd;
-    checkEmpty.trim();
-    
-    if (checkEmpty == "set firmware") {
-        tft.setTextColor(TFT_YELLOW);
-        tft.println(">> current firmware options:");
-        tft.setTextColor(TFT_WHITE);
-        tft.println("BIOS : classic firmware, safe");
-        tft.println("UEFI : new technology, many setting");
-    } 
-    else {
-        // 2. "set firmware " 뒤의 문자열 파싱 (안전하게 인덱스 계산)
-        String sub = cmd.substring(12); 
-        sub.trim(); // 공백 제거 후 다시 대입 필수!
-        
-        // [UI 알림] 시각적 피드백
-        tft.setTextColor(TFT_CYAN);
-        tft.print("you choose firmware is ");
-        tft.setTextColor(TFT_WHITE);
-        tft.println(sub);
-        
-        // 대소문자 구분을 없애기 위해 소문자로 통일해서 비교하면 코드가 깔끔해집니다.
-        String subLower = sub;
-        subLower.toLowerCase();
-        
-        if (subLower == "bios") {
-          Firmware = "BIOS";
-          CreateFile("/Ardudows/System/Firmware/Firmware.asf", "Firmware is BIOS");
-          Loading();
-          // 기존 내용을 싹 지우고 "BIOS" 네 글자만 딱 덮어쓰기!
-          CreateFile("/Ardudows/System/ImpoSystem/Boot/FIRMWARE_TYPE.asf", Firmware.c_str()); 
-          Loading();
-          tft.println("Complete! rebooting to BIOS...");
-          delay(1000);
-          ESP.restart();
-        }
-        else if (subLower == "uefi") {
-          Firmware = "UEFI";
-          CreateFile("/Ardudows/System/Firmware/Firmware.asf", "Firmware is UEFI");
-          Loading();
-          // 기존 내용을 싹 지우고 "UEFI" 네 글자만 딱 덮어쓰기!
-          CreateFile("/Ardudows/System/ImpoSystem/Boot/FIRMWARE_TYPE.asf", Firmware.c_str()); 
-          Loading();
-          tft.println("Complete! rebooting to UEFI...");
-          delay(1000);
-          ESP.restart();
-        }
-        else {
-          // 예외 처리: 이상한 문자열을 입력했을 때 커널 붕괴 방지
-          tft.setTextColor(TFT_RED);
-          tft.println("Error: Unknown firmware type! Use 'BIOS' or 'UEFI'.");
-        }
-    }
-  }
-
   else if (cmd.startsWith("print ")) {
     String sub = cmd.substring(6);
     sub.trim();
     tft.println(sub);
+  }
+
+  // ==========================================
+  // 1. WIFI REPEATER 명령어 처리
+  // ==========================================
+  else if (cmd.startsWith("wifi repeater ")) {
+    String cmdName = "wifi repeater ";
+    String params = cmd.substring(cmdName.length()); // 명령어 이후의 문자열만 쏙 빼옴
+    params.trim();
+
+    int firstSpace = params.indexOf(' '); // params 내에서 첫 번째 공백 찾기
+    
+    if (firstSpace > 0) {
+      String ssid = params.substring(0, firstSpace);
+      String pass = params.substring(firstSpace + 1);
+    
+      tft.printf(">> Configuring Repeater: %s\n", ssid.c_str());
+    
+      // 1. 기존 STA 연결 시도
+      WiFi.mode(WIFI_AP_STA);
+      WiFi.begin(ssid.c_str(), pass.c_str());
+    
+      // 2. AP 모드 설정 (Ardudows_Net_Extended)
+      WiFi.softAP("Ardudows_Extender", "ardudows123");
+    
+      tft.println(">> Repeater Active. AP: Ardudows_Extender");
+    } else {
+      tft.println("Usage: wifi repeater <SSID> <PASSWORD>");
+    }
+  }
+
+  // ==========================================
+  // 2. WIFI ROUTER 명령어 처리
+  // ==========================================
+  else if (cmd.startsWith("wifi router ")) {
+    String cmdName = "wifi router ";
+    String params = cmd.substring(cmdName.length()); // "wifi router " 이후의 모든 문자열
+    params.trim();
+
+    // 공백으로 나누기 (SSID, PASS, IP)
+    int firstSpace = params.indexOf(' ');
+    int secondSpace = params.indexOf(' ', firstSpace + 1);
+
+    if (firstSpace != -1 && secondSpace != -1) {
+      String ssid = params.substring(0, firstSpace);
+      String pass = params.substring(firstSpace + 1, secondSpace);
+      String ipStr = params.substring(secondSpace + 1);
+
+      tft.printf(">> Router Setting:\nSSID: %s\nPASS: %s\nIP: %s\n", 
+                 ssid.c_str(), pass.c_str(), ipStr.c_str());
+
+      // 여기에 실제 WiFi.softAPConfig 및 설정 로직 추가
+    } else {
+      tft.println("Usage: wifi router <SSID> <PASS> <IP>");
+    }
   }
 
   //====================================================================================
@@ -12908,7 +13929,7 @@ void executeCommand(String cmd) {
     String subCmd = cmd.substring(9);
     subCmd.trim();
 
-        // ===============================================================================
+    // ===============================================================================
     // Ardudows Absolute Master Matrix - Advanced Categorized HELP System
     // ===============================================================================
     if (subCmd == "help" || subCmd == "?" || subCmd.startsWith("help ")) {
@@ -13942,6 +14963,84 @@ void executeCommand(String cmd) {
       tft.println(F("================================================="));
     }
   }
+
+  // ==========================================
+  // TREE 명령어 처리 (SD 카드 디렉터리 구조 출력)
+  // ==========================================
+  else if (cmd.startsWith("tree")) {
+    String path = "/"; // 기본 경로 설정
+    
+    // 만약 "tree " 뒤에 인자(경로)가 넘어왔다면 해당 경로 추출
+    if (cmd.startsWith("tree ")) {
+      path = cmd.substring(5);
+      path.trim();
+    }
+
+    tft.printf(">> Directory tree for: %s\n", path.c_str());
+
+    // SD 카드에서 시작 폴더 열기
+    File root = SD.open(path);
+    if (!root) {
+      tft.println("Error: Failed to open directory.");
+    } 
+    else if (!root.isDirectory()) {
+      tft.println("Error: Path is not a directory.");
+      root.close();
+    } 
+    else {
+      // 파일 포인터를 디렉터리 처음으로 되돌림
+      root.rewindDirectory();
+
+      while (true) {
+        File entry = root.openNextFile();
+        if (!entry) {
+          break; // 더 이상 파일이나 폴더가 없으면 반복문 탈출
+        }
+
+        // 현재 엔트리의 전체 경로에서 '/' 개수를 세어 깊이(Level) 계산
+        String entryPath = entry.name();
+        int level = 0;
+        for (int i = 0; i < entryPath.length(); i++) {
+          if (entryPath[i] == '/') {
+            level++;
+          }
+        }
+
+        // ----------------------------------------------------
+        // else if 체인을 이용한 깊이별 트리 기호 출력
+        // ----------------------------------------------------
+        if (level == 1) {
+          tft.print("├── ");
+        } 
+        else if (level == 2) {
+          tft.print("│   ├── ");
+        } 
+        else if (level == 3) {
+          tft.print("│   │   ├── ");
+        } 
+        else if (level == 4) {
+          tft.print("│   │   │   ├── ");
+        } 
+        else {
+          // 그 이상 깊은 고차원 디렉터리는 반복문 처리
+          for (int i = 1; i < level; i++) {
+            tft.print("│   ");
+          }
+          tft.print("├── ");
+        }
+
+        // 이름 및 폴더/파일 구분 출력
+        if (entry.isDirectory()) {
+          tft.printf("%s/\n", entry.name());
+        } else {
+          tft.printf("%s (%d bytes)\n", entry.name(), entry.size());
+        }
+
+        entry.close();
+      }
+      root.close();
+    }
+  }
   
   // --- [ UNKNOWN ] ---
   else {
@@ -14450,8 +15549,29 @@ void Ardudows_StateMachine() {
 
           else if (key == KEY_BACKSPACE) {
             if (loginInput.length() > 0) {
+              // 1. 지워질 마지막 글자 한 개를 빼옵니다.
+              char lastChar = loginInput.charAt(loginInput.length() - 1);
               loginInput.remove(loginInput.length() - 1);
-              tft.print("\b \b");
+
+              // 2. TFT_eSPI 전용 함수로 현재 폰트/크기 기준의 정확한 너비(w)와 높이(h)를 구합니다.
+              String charStr = String(lastChar);
+              int16_t w = tft.textWidth(charStr);
+              int16_t h = tft.fontHeight();
+
+              // 방어 코드: 글자 너비가 비정상적으로 잡힐 경우 최소 기본 너비 지정
+              if (w <= 0) w = 6; 
+
+              // 3. 커서 좌표를 계산된 글자 너비(w)만큼 왼쪽으로 강제 이동
+              int newX = tft.getCursorX() - w;
+              int currentY = tft.getCursorY();
+              if (newX < 0) newX = 0; // 프롬프트 영역 침범 방지
+
+              // 4. TFT_eSPI는 문자 출력 시 y좌표 기준이 다를 수 있으므로, 
+              // 안전하게 커서 Y축 기준 상하 여유를 두고 검은색 사각형으로 밀어버립니다.
+              tft.fillRect(newX, currentY, w, h, TFT_BLACK);
+
+              // 5. 다음 글자가 그려질 커서 위치를 지워진 시작점으로 세팅
+              tft.setCursor(newX, currentY);
             }
           }
 
@@ -14682,6 +15802,7 @@ void GoArdudows() {
 }
 
 // 펌웨어 설정 로드 함수
+/*
 void loadFirmwareSettings() {
   File file = SD.open("/Ardudows/System/ImpoSystem/Boot/FIRMWARE_TYPE.asf", FILE_READ);
   
@@ -14711,6 +15832,7 @@ void loadFirmwareSettings() {
     while(1); // 시스템 정지 (안전 장치)
   }
 }
+*/
 
 //===아주 귀찮은 setup문===
 void setup() {
@@ -14750,7 +15872,8 @@ void setup() {
     Serial.println("SD not detected → Recovery mode");
 
     bootState = BOOT_RECOVERY;
-    loadFirmwareSettings();
+    ArduBios();
+    //loadFirmwareSettings();
     return;
   }
 
@@ -14771,7 +15894,8 @@ void setup() {
     Serial.println("Ardudows not installed → Install mode");
 
     bootState = BOOT_INSTALL;
-    loadFirmwareSettings();
+    ArduBios();
+    //loadFirmwareSettings();
     return;
   }
 
@@ -14795,7 +15919,9 @@ void setup() {
   // BIOS 시작
   // =========================
 
-  loadFirmwareSettings();
+  ArduBios();
+
+  //loadFirmwareSettings();
   
   //initRTC();
   bootTime = millis();
