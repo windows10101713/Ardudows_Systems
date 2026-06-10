@@ -11373,6 +11373,209 @@ void cmd_cal() {
   tft.println("=====================================");
 }
 
+/*
+
+//DOS관련 메모장
+//하하하하하하하하하하하하하
+//화난다
+
+C:\  (루트 디렉토리)
+├── COMMAND.COM     (명령어 처리기 - 부팅 필수 파일)
+├── AUTOEXEC.BAT    (부팅 시 자동으로 실행되는 배치 스크립트)
+├── CONFIG.SYS      (메모리 및 하드웨어 설정 파일)
+├── DOS\            (DOS 운영체제의 외부 명령어와 유틸리티 모음)
+│   ├── FORMAT.COM
+│   └── XCOPY.EXE
+├── WINDOWS\        (윈도우 3.1 등을 설치하면 생기는 폴더)
+│   ├── WIN.COM
+│   └── SYSTEM\
+└── GAMES\          (고전 게임들이 주로 깔리던 곳)
+    ├── DOOM\
+    └── PRINCE\
+
+SeaBIOS (version 1.16.3-debian-1.16.3-2)
+
+Booting from Hard Disk...
+Boot failed: not a bootable disk
+
+Booting from Floppy...
+Boot failed: could not read the boot disk
+
+No bootable device.
+
+*/
+
+//===파일 검사===
+bool dosFileCheck() {
+  if(SD.exists("/Ardudows/Assets/MSdos/C:") && 
+     SD.exists("/Ardudows/Assets/MSdos/Floppy0") && 
+     SD.exists("/Ardudows/Assets/MSdos/C:/DOS") && 
+     SD.exists("/Ardudows/Assets/MSdos/C:/COMMAND.COM") && 
+     SD.exists("/Ardudows/Assets/MSdos/C:/AUTOEXEC.BAT") && 
+     SD.exists("/Ardudows/Assets/MSdos/C:/CONFIG.SYS") && 
+     SD.exists("/Ardudows/Assets/MSdos/C:/DOS/FORMAT.COM") && 
+     SD.exists("/Ardudows/Assets/MSdos/C:/DOS/XCOPY.EXE")) {
+    //노가다 젠장
+    return true;
+  }
+  else {
+    return false;
+  }
+}
+
+//===플로피 검사===
+bool dosFloppyCheck() {
+  if(!SD.exists("/Ardudows/Assets/MSdos/Floppy0") || 
+     !SD.exists("/Ardudows/Assets/MSdos/Floppy0/C:") || 
+     !SD.exists("/Ardudows/Assets/MSdos/Floppy0/C:/DOS") || 
+     !SD.exists("/Ardudows/Assets/MSdos/Floppy0/C:/COMMAND.COM") || 
+     !SD.exists("/Ardudows/Assets/MSdos/Floppy0/C:/AUTOEXEC.BAT") ||  
+     !SD.exists("/Ardudows/Assets/MSdos/Floppy0/C:/CONFIG.SYS") || 
+     !SD.exists("/Ardudows/Assets/MSdos/Floppy0/C:/DOS/FORMAT.COM") || 
+     !SD.exists("/Ardudows/Assets/MSdos/Floppy0/C:/DOS/XCOPY.EXE")) {
+     
+    SD.mkdir("/Ardudows/Assets/MSdos/Floppy0");
+    SD.mkdir("/Ardudows/Assets/MSdos/Floppy0/C:");
+    SD.mkdir("/Ardudows/Assets/MSdos/Floppy0/C:/DOS");
+    CreateFile("/Ardudows/Assets/MSdos/Floppy0/C:/COMMAND.COM", "");
+    CreateFile("/Ardudows/Assets/MSdos/Floppy0/C:/AUTOEXEC.BAT", "");
+    CreateFile("/Ardudows/Assets/MSdos/Floppy0/C:/CONFIG.SYS", "");
+    CreateFile("/Ardudows/Assets/MSdos/Floppy0/C:/DOS/FORMAT.COM", "");
+    CreateFile("/Ardudows/Assets/MSdos/Floppy0/C:/DOS/XCOPY.EXE", "");
+  }
+  return true;
+}
+
+//msdos임 나 저작권으로 고소 당하냐?
+//===DOS===
+void MSdos() {
+  String dosCommand = "";
+  String dosRootPath = "/Ardudows/Assets/MSdos/C:";
+  String dosCurrentPath = "/Ardudows/Assets/MSdos/C:";
+  bool dosFileCheck = false;
+  bool dosFloppyCheck = false;
+  String cmd = "";
+  String arg = "";
+  tft.println("SeaBIOS (version for Ardudows Systems)");
+  tft.println("Booting from Hard Disk...");
+  if(SD.exists("/") == false) {
+    tft.println("No bootable device.");
+  }
+  else if (dosFileCheck == false) {
+    SD.mkdir("/Ardudows/Assets/MSdos/C:");
+    //SD.mkdir("/Ardudows/Assets/MSdos/floppy0");
+    SD.mkdir("/Ardudows/Assets/MSdos/C:/DOS");
+    CreateFile("/Ardudows/Assets/MSdos/C:/COMMAND.COM", "");
+    CreateFile("/Ardudows/Assets/MSdos/C:/AUTOEXEC.BAT", "");
+    CreateFile("/Ardudows/Assets/MSdos/C:/CONFIG.SYS", "");
+    CreateFile("/Ardudows/Assets/MSdos/C:/DOS/FORMAT.COM", "");
+    CreateFile("/Ardudows/Assets/MSdos/C:/DOS/XCOPY.EXE", "");
+  }
+  else if(!dosFloppyCheck == true) {
+    tft.println("Booting from Floppy...");
+    tft.println("Boot failed: could not read the boot disk");
+  }
+  else {
+    tft.println("Unknown Error : (");
+  }
+  
+  if (dosCommand == "help") {
+    tft.println("cls : clear screen");
+    tft.println("cd : chenge directory");
+    tft.println("copy : copy");
+    tft.println("dir : directory");
+    tft.println("del : delete");
+    tft.println("md : make derectory");
+    tft.println("rd / rmdir : remove directory");
+    tft.println("ren : rename");
+    tft.println("ver : version");
+    tft.println("help : help");
+  }
+
+  else if (dosCommand == "cls") {
+    tft.fillScreen(TFT_BLACK);
+    tft.setCursor(0, 0);
+  }
+
+  //여기부터
+
+  else if (cmd == "ver") {
+    tft.println("MS-DOS version for Ardudows Systems");
+  }
+
+  else if (cmd == "dir") {
+    File dir = SD.open(dosCurrentPath);
+    if (!dir) {
+      tft.println("Directory open failed.");
+      return;
+    }
+    tft.println(" Directory of " + dosCurrentPath);
+    tft.println("");
+
+    while (true) {
+      File entry = dir.openNextFile();
+      if (!entry) {
+        break; // 더 이상 파일이 없으면 탈출
+      }
+      
+      // 도스 감성 파일 리스트 출력 (이름 + 디렉토리 여부 + 크기)
+      tft.print(entry.name());
+      if (entry.isDirectory()) {
+        tft.println("\t<DIR>");
+      } else {
+        tft.print("\t\t");
+        tft.print(entry.size());
+        tft.println(" bytes");
+      }
+      entry.close();
+    }
+    dir.close();
+  }
+
+  else if (cmd == "cd") {
+    if (arg == "") {
+      // 인자 없이 "cd"만 치면 현재 경로 출력
+      tft.println(dosCurrentPath);
+    } 
+    else if (arg == "..") {
+      // 상위 폴더로 이동 처리 (마지막 '/' 위치를 찾아서 잘라냄)
+      int lastSlash = dosCurrentPath.lastIndexOf('/');
+      if (lastSlash > 22) { // "/Ardudows/Assets/MSdos/C:" 이 하위일 때만 뒤로가기 허용
+        dosCurrentPath = dosCurrentPath.substring(0, lastSlash);
+      }
+    } 
+    else {
+      // 하위 폴더로 이동 시도
+      String targetPath = dosCurrentPath + "/" + arg;
+      if (SD.exists(targetPath)) {
+        File checkDir = SD.open(targetPath);
+        if (checkDir.isDirectory()) {
+          dosCurrentPath = targetPath;
+        } else {
+          tft.println("Not a directory.");
+        }
+        checkDir.close();
+      } else {
+        tft.println("Invalid directory - " + arg);
+      }
+    }
+  }
+  // 알 수 없는 명령어 처리
+  else {
+    tft.println("Bad command or file name");
+  }
+
+  // 가상 프롬프트 다시 띄워주기
+  // 가독성을 위해 루트 경로는 생략하고 가상 C:\> 경로처럼 보이게 커스텀 가능
+  String displayPath = dosCurrentPath;
+  displayPath.replace("/Ardudows/Assets/MSdos/C:", "C:");
+  displayPath.replace("/", "\\"); // 도스 감성 백슬래시 전환
+  tft.print("\n" + displayPath + ">");
+
+  //여기까지 AI좀 씀 ㅎㅎ
+
+}
+
 // ================== COMMAND PARSER ==================
 
 /*
@@ -12752,7 +12955,7 @@ void executeCommand(String cmd) {
   }
 
   // 70. 3D 와이어프레임 큐브 회전 연산 가속 벤치마크 진입
-    else if (cmd == "3d demo") {
+  else if (cmd == "3d demo") {
     tft.fillScreen(TFT_BLACK);
     tft.setTextColor(TFT_GREEN, TFT_BLACK);
     tft.drawString("3D WIREFRAME ENGINE v1.0", 5, 5, 2);
@@ -12912,14 +13115,15 @@ void executeCommand(String cmd) {
 
   // 82. 다운타임 카운트다운 타이머 (디스플레이 블러킹 알람 - us, ms, s, m, h 지원 + 잔상 제거 + 프로그래스 바)
   else if (cmd.startsWith("timer ")) {
-    String param = cmd.substring(6); 
+    String param = cmd.substring(6);
     param.trim();
 
     long long durationVal = 0;
     String unit = "";
-    
+
     for (int i = 0; i < param.length(); i++) {
         char c = param.charAt(i);
+
         if (isDigit(c)) {
             durationVal = durationVal * 10 + (c - '0');
         } else {
@@ -12933,15 +13137,20 @@ void executeCommand(String cmd) {
 
     if (unit == "us") {
         total_us = durationVal;
-    } else if (unit == "ms") {
-        total_us = durationVal * 1000;
-    } else if (unit == "s" || unit == "") { 
-        total_us = durationVal * 1000000;
-    } else if (unit == "m") {               
-        total_us = durationVal * 60 * 1000000;
-    } else if (unit == "h") {
-        total_us = durationVal * 3600 * 1000000;
-    } else {
+    }
+    else if (unit == "ms") {
+        total_us = durationVal * 1000ULL;
+    }
+    else if (unit == "s" || unit == "") {
+        total_us = durationVal * 1000000ULL;
+    }
+    else if (unit == "m") {
+        total_us = durationVal * 60ULL * 1000000ULL;
+    }
+    else if (unit == "h") {
+        total_us = durationVal * 3600ULL * 1000000ULL;
+    }
+    else {
         tft.println(">> ERROR: UNKNOWN UNIT (Use us, ms, s, m, h)");
         return;
     }
@@ -12955,47 +13164,59 @@ void executeCommand(String cmd) {
     int16_t startX = tft.getCursorX();
     int16_t startY = tft.getCursorY();
 
-    // 4. 카운트다운 루프 (오직 게이지바만 집중 마크)
     while (esp_timer_get_time() < target_us) {
+
         uint64_t now = esp_timer_get_time();
 
-        // 텍스트가 줄어들어 부하가 적으므로 갱신 주기를 더 빠르게(대략 16ms, 60FPS 급) 당겨옵니다.
-        if (now - last_display_us >= 16666) { 
+        if (now - last_display_us >= 16666) {
             last_display_us = now;
-            
-            tft.setCursor(startX, startY);
-            tft.setTextColor(TFT_GREEN, TFT_BLACK); 
 
-            // 진행률 계산
-            double progress = (double)(now - start_us) / (double)total_us;
+            double progress =
+                (double)(now - start_us) /
+                (double)total_us;
+
             if (progress > 1.0) progress = 1.0;
             if (progress < 0.0) progress = 0.0;
-            
-            // 20칸짜리 롱 프로그래스 바로 대폭 업그레이드 (더 찰진 손맛)
+
             int filled_chars = (int)(progress * 20.0);
 
             String progressBar = "[";
+
             for (int i = 0; i < 20; i++) {
-                if (i < filled_chars) progressBar += "#";
-                else progressBar += "-";
+                if (i < filled_chars)
+                    progressBar += "#";
+                else
+                    progressBar += "-";
             }
+
             progressBar += "]";
 
-            // 숫자는 다 빼고 게이지바와 진행 퍼센트만 깔끔하게 출력!
-            tft.printf("%s %3d%%      \n", progressBar.c_str(), (int)(progress * 100.0));
+            uint64_t remain_us = target_us - now;
+            uint32_t remain_sec = remain_us / 1000000ULL;
+
+            tft.setCursor(startX, startY);
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+
+            tft.printf(
+                "%s %3d%% REM:%lus      \n",
+                progressBar.c_str(),
+                (int)(progress * 100.0),
+                remain_sec
+            );
         }
-        delayMicroseconds(2); 
+
+        delayMicroseconds(2);
     }
 
-    // 5. 타임아웃 알람 발생
     tft.setCursor(startX, startY);
     tft.setTextColor(TFT_GREEN, TFT_BLACK);
-    tft.println("[####################] 100%");
+
+    tft.println("[####################] 100% REM:0s");
     tft.println(">> TIME UP!");
-    
-    for(int i = 0; i < 3; i++) { 
-        pz(1500, 100); 
-        delay(50); 
+
+    for (int i = 0; i < 3; i++) {
+        pz(1500, 100);
+        delay(50);
     }
   }
 
@@ -15617,6 +15838,11 @@ void executeCommand(String cmd) {
 
   else if (cmd == "cal") {
     cmd_cal();
+  }
+
+  else if (cmd == "dos" || cmd == "msdos" || cmd == "ms-dos" || cmd == "ms dos" || cmd == "DOS") {
+    tft.setTextColor(TFT_WHITE);
+    MSdos();
   }
   
   // --- [ UNKNOWN ] ---
