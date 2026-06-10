@@ -539,3 +539,21 @@ This project is intended for learning, experimentation, and development purposes
 
 > “ESP32-S3를 운영체제처럼 만들기 위한 실험.”
 > “An experiment to turn the ESP32-S3 into a computer-like operating system.”
+
+
+
+
+
+
+
+
+> Do not build another Windows.
+> Do not build another Linux.
+> Build something that could only be Ardudows.
+
+
+
+
+> 또 하나의 Windows를 만들지 말아라.
+> 또 하나의 Linux를 만들지 말아라.
+> 오직 Ardudows만 될 수 있는 것을 만들어라.
