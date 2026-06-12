@@ -23,6 +23,9 @@
 //왜냐하면 학원갸야 하거든요.
 //EspUsbHost.h 라이브러리 불러오면 DRAM 부족으로 터짐
 //163일차 오늘 램을 100kb넘게 확보함 (BLE삭제 + 레지스트리 조정)
+//169일차 내 키는 아마 169.9cm이다
+//169일차 MSdos() 개선함
+//169일차 UI 정의 완료
 
 //===겁나 쉬운 라이브러리 불러오기===
 //이때가 젤 좋았었음...
@@ -145,6 +148,7 @@
 #include "esp_ds.h"
 #include "esp_flash_encrypt.h"
 #include <timers.h>
+#include "driver/temp_sensor.h"
 
 //===대입문(?)과 변수등 일단 뭐 아무거나 선언===
 
@@ -498,8 +502,14 @@ String menuItems[] = {
 };
 enum INSTALL_STAGE {
   INST_WELCOME,
+  INST_SECU, //위조 방지 체크
+  INST_UI_SET, // 이거는 GUI로 설치할건지 CLI로 설치할 건지
+  INST_TYPE, // 이거는 자동으로 할거냐 커스텀으로 할거냐
+  INST_SD_CKECK, // SD사양 공개
   INST_LICENSE,
   INST_COPYING,
+  INST_INSTALL,
+  INST_THANK, //감사창
   INST_DONE
 };
 
@@ -1154,16 +1164,6 @@ bool Registry_Get_Touch() {
 }
 */
 
-//===UI_MODE===
-void Windows_like() {}
-void Mac_like() {}
-void Mad_UI() {}
-void Simple() {}
-void Anime() {}
-void Industial() {}
-void No_UI() {}
-void OUC() {}  //Only User Custom이 OUC
-
 //===APTC(Ardudows ProToCol)===
 void sendAPTC(const char* key) {
   Serial1.println("S");
@@ -1438,6 +1438,280 @@ void Triangle(int x1, int y1, int x2, int y2, int x3, int y3, const char* text, 
   //C코드 치워버릴까
 }
 
+struct UITheme {
+  uint16_t backgroundColor;
+
+  uint16_t titleBarColor;
+  uint16_t titleTextColor;
+
+  uint16_t borderColor;
+
+  uint16_t textColor;
+
+  uint16_t statusBarColor;
+  uint16_t statusTextColor;
+
+  bool roundedCorners;
+
+  String name;
+};
+
+UITheme ui;
+
+//===UI_MODE===
+void Windows_like() {
+
+  ui.name = "Windows_like";
+
+  // 배경
+  ui.backgroundColor = TFT_WHITE;
+
+  // 상단 바
+  ui.titleBarColor = TFT_BLUE;
+  ui.titleTextColor = TFT_WHITE;
+
+  // 테두리
+  ui.borderColor = TFT_BLACK;
+
+  // 본문
+  ui.textColor = TFT_BLACK;
+
+  // 하단 도움말 바
+  ui.statusBarColor = TFT_LIGHTGREY;
+  ui.statusTextColor = TFT_BLACK;
+
+  // Windows 스타일은 각진 사각형
+  ui.roundedCorners = false;
+
+}
+void Mac_like() {
+
+  ui.name = "Mac_like";
+
+  // 배경
+  ui.backgroundColor = TFT_WHITE;
+
+  // 제목바 (은은한 회색)
+  ui.titleBarColor = TFT_LIGHTGREY;
+  ui.titleTextColor = TFT_BLACK;
+
+  // 테두리
+  ui.borderColor = TFT_DARKGREY;
+
+  // 본문
+  ui.textColor = TFT_BLACK;
+
+  // 하단바
+  ui.statusBarColor = TFT_LIGHTGREY;
+  ui.statusTextColor = TFT_BLACK;
+
+  // macOS 느낌 = 둥근 모서리
+  ui.roundedCorners = true;
+
+}
+void Mad_UI() {
+
+  ui.name = "Mad_UI";
+
+  // 초기 랜덤 색상
+  ui.backgroundColor = random(65535);
+
+  ui.titleBarColor = random(65535);
+  ui.titleTextColor = random(65535);
+
+  ui.borderColor = random(65535);
+
+  ui.textColor = random(65535);
+
+  ui.statusBarColor = random(65535);
+  ui.statusTextColor = random(65535);
+
+  ui.roundedCorners = random(2);
+
+}
+void Simple() {
+
+  ui.name = "Simple";
+
+  // 배경
+  ui.backgroundColor = TFT_BLACK;
+
+  // 상단바
+  ui.titleBarColor = TFT_DARKGREY;
+  ui.titleTextColor = TFT_WHITE;
+
+  // 테두리
+  ui.borderColor = TFT_WHITE;
+
+  // 본문
+  ui.textColor = TFT_WHITE;
+
+  // 하단바
+  ui.statusBarColor = TFT_DARKGREY;
+  ui.statusTextColor = TFT_WHITE;
+
+  // 둥근 모서리 없음
+  ui.roundedCorners = false;
+
+}
+void Anime() {
+  tft.fillScreen(TFT_WHITE);
+
+  // 상단바
+  tft.fillRect(0, 0, 320, 24, TFT_PINK);
+
+  tft.setTextColor(TFT_BLACK);
+  tft.setCursor(8, 6);
+  tft.print("Anime UI");
+
+  // ===== 픽셀아트 캐릭터 =====
+
+  // 머리
+  tft.fillRect(20, 40, 8, 8, TFT_YELLOW);
+  tft.fillRect(28, 40, 8, 8, TFT_YELLOW);
+  tft.fillRect(36, 40, 8, 8, TFT_YELLOW);
+
+  tft.fillRect(20, 48, 8, 8, TFT_YELLOW);
+  tft.fillRect(28, 48, 8, 8, TFT_YELLOW);
+  tft.fillRect(36, 48, 8, 8, TFT_YELLOW);
+
+  // 눈
+  tft.fillRect(24, 52, 4, 4, TFT_BLACK);
+  tft.fillRect(36, 52, 4, 4, TFT_BLACK);
+
+  // 입
+  tft.drawLine(28, 60, 36, 60, TFT_RED);
+
+  // 몸
+  tft.fillRect(28, 64, 8, 16, TFT_BLUE);
+
+  // 팔
+  tft.fillRect(20, 64, 8, 4, TFT_BLUE);
+  tft.fillRect(36, 64, 8, 4, TFT_BLUE);
+
+  // 다리
+  tft.fillRect(28, 80, 4, 12, TFT_BLACK);
+  tft.fillRect(32, 80, 4, 12, TFT_BLACK);
+
+  // ===== 창 =====
+
+  tft.fillRect(80, 40, 220, 120, TFT_WHITE);
+  tft.drawRect(80, 40, 220, 120, TFT_BLACK);
+
+  tft.setCursor(90, 55);
+  tft.print("Kawaii File Manager");
+
+  tft.setCursor(90, 80);
+  tft.print("> apps");
+
+  tft.setCursor(90, 100);
+  tft.print("> games");
+
+  tft.setCursor(90, 120);
+  tft.print("> config.sys");
+
+  // 하단바
+  tft.fillRect(0, 216, 320, 24, TFT_PINK);
+
+  tft.setCursor(4, 222);
+  tft.print("ESC Exit");
+}
+void Industial() {
+
+  // 배경
+  tft.fillScreen(TFT_DARKGREY);
+
+  // 상단 상태바
+  tft.fillRect(0, 0, 320, 24, TFT_LIGHTGREY);
+
+  tft.setTextColor(TFT_BLACK);
+  tft.setCursor(4, 6);
+  tft.print("INDUSTRIAL CONTROL PANEL");
+
+  // 메인 패널
+  tft.fillRect(10, 35, 300, 150, TFT_BLACK);
+  tft.drawRect(10, 35, 300, 150, TFT_LIGHTGREY);
+
+  // 상태 표시
+  tft.setTextColor(TFT_GREEN);
+
+  tft.setCursor(20, 50);
+  tft.print("[OK] SYSTEM");
+
+  tft.setCursor(20, 70);
+  tft.print("[OK] STORAGE");
+
+  tft.setCursor(20, 90);
+  tft.print("[OK] NETWORK");
+
+  tft.setCursor(20, 110);
+  tft.print("[OK] KERNEL");
+
+  // 가짜 게이지
+  tft.drawRect(150, 50, 120, 12, TFT_WHITE);
+  tft.fillRect(152, 52, 80, 8, TFT_GREEN);
+
+  tft.drawRect(150, 75, 120, 12, TFT_WHITE);
+  tft.fillRect(152, 77, 45, 8, TFT_YELLOW);
+
+  tft.drawRect(150, 100, 120, 12, TFT_WHITE);
+  tft.fillRect(152, 102, 100, 8, TFT_GREEN);
+
+  // 경고 박스
+  tft.fillRect(20, 140, 250, 30, TFT_RED);
+
+  tft.setTextColor(TFT_WHITE);
+  tft.setCursor(30, 150);
+  tft.print("NO ERRORS DETECTED");
+
+  // 하단 도움말
+  tft.fillRect(0, 216, 320, 24, TFT_LIGHTGREY);
+
+  tft.setTextColor(TFT_BLACK);
+  tft.setCursor(4, 222);
+  tft.print("ESC Exit  UP/DOWN Select");
+}
+//void No_UI() {}
+void OUC() {
+
+  // 배경
+  tft.fillScreen(ui.backgroundColor);
+
+  // 제목바
+  tft.fillRect(0, 0, 320, 24, ui.titleBarColor);
+
+  // 제목
+  tft.setTextColor(ui.titleTextColor);
+  tft.setCursor(4, 6);
+  tft.print(ui.name);
+
+  // 메인 프레임
+  tft.drawRect(
+      5,
+      30,
+      310,
+      180,
+      ui.borderColor);
+
+  // 내용
+  tft.setTextColor(ui.textColor);
+
+  tft.setCursor(10, 40);
+  tft.print("Custom UI Loaded");
+
+  // 상태바
+  tft.fillRect(
+      0,
+      216,
+      320,
+      24,
+      ui.statusBarColor);
+
+  tft.setTextColor(ui.statusTextColor);
+
+  tft.setCursor(4, 222);
+  tft.print("ESC Exit");
+}  //Only User Custom이 OUC
 
 //===쉬워보이지만 겁내 어려운 SD체크 함수===
 void SD_Check() {
@@ -11407,14 +11681,15 @@ No bootable device.
 
 //===파일 검사===
 bool dosFileCheck() {
-  if(SD.exists("/Ardudows/Assets/MSdos/C:") && 
-     SD.exists("/Ardudows/Assets/MSdos/Floppy0") && 
-     SD.exists("/Ardudows/Assets/MSdos/C:/DOS") && 
-     SD.exists("/Ardudows/Assets/MSdos/C:/COMMAND.COM") && 
-     SD.exists("/Ardudows/Assets/MSdos/C:/AUTOEXEC.BAT") && 
-     SD.exists("/Ardudows/Assets/MSdos/C:/CONFIG.SYS") && 
-     SD.exists("/Ardudows/Assets/MSdos/C:/DOS/FORMAT.COM") && 
-     SD.exists("/Ardudows/Assets/MSdos/C:/DOS/XCOPY.EXE")) {
+  if(SD.exists("/Ardudows/Assets/MSdos") && 
+     SD.exists("/Ardudows/Assets/MSdos/Floppy0") &&
+     SD.exists("/Ardudows/Assets/MSdos/C") &&
+     SD.exists("/Ardudows/Assets/MSdos/C/DOS") && 
+     SD.exists("/Ardudows/Assets/MSdos/C/COMMAND.COM") && 
+     SD.exists("/Ardudows/Assets/MSdos/C/AUTOEXEC.BAT") && 
+     SD.exists("/Ardudows/Assets/MSdos/C/CONFIG.SYS") && 
+     SD.exists("/Ardudows/Assets/MSdos/C/DOS/FORMAT.COM") && 
+     SD.exists("/Ardudows/Assets/MSdos/C/DOS/XCOPY.EXE")) {
     //노가다 젠장
     return true;
   }
@@ -11426,40 +11701,43 @@ bool dosFileCheck() {
 //===플로피 검사===
 bool dosFloppyCheck() {
   if(!SD.exists("/Ardudows/Assets/MSdos/Floppy0") || 
-     !SD.exists("/Ardudows/Assets/MSdos/Floppy0/C:") || 
-     !SD.exists("/Ardudows/Assets/MSdos/Floppy0/C:/DOS") || 
-     !SD.exists("/Ardudows/Assets/MSdos/Floppy0/C:/COMMAND.COM") || 
-     !SD.exists("/Ardudows/Assets/MSdos/Floppy0/C:/AUTOEXEC.BAT") ||  
-     !SD.exists("/Ardudows/Assets/MSdos/Floppy0/C:/CONFIG.SYS") || 
-     !SD.exists("/Ardudows/Assets/MSdos/Floppy0/C:/DOS/FORMAT.COM") || 
-     !SD.exists("/Ardudows/Assets/MSdos/Floppy0/C:/DOS/XCOPY.EXE")) {
+     !SD.exists("/Ardudows/Assets/MSdos/Floppy0/C") || 
+     !SD.exists("/Ardudows/Assets/MSdos/Floppy0/C/DOS") || 
+     !SD.exists("/Ardudows/Assets/MSdos/Floppy0/C/COMMAND.COM") || 
+     !SD.exists("/Ardudows/Assets/MSdos/Floppy0/C/AUTOEXEC.BAT") ||  
+     !SD.exists("/Ardudows/Assets/MSdos/Floppy0/C/CONFIG.SYS") || 
+     !SD.exists("/Ardudows/Assets/MSdos/Floppy0/C/DOS/FORMAT.COM") || 
+     !SD.exists("/Ardudows/Assets/MSdos/Floppy0/C/DOS/XCOPY.EXE")) {
      
     SD.mkdir("/Ardudows/Assets/MSdos/Floppy0");
-    SD.mkdir("/Ardudows/Assets/MSdos/Floppy0/C:");
-    SD.mkdir("/Ardudows/Assets/MSdos/Floppy0/C:/DOS");
-    CreateFile("/Ardudows/Assets/MSdos/Floppy0/C:/COMMAND.COM", "");
-    CreateFile("/Ardudows/Assets/MSdos/Floppy0/C:/AUTOEXEC.BAT", "");
-    CreateFile("/Ardudows/Assets/MSdos/Floppy0/C:/CONFIG.SYS", "");
-    CreateFile("/Ardudows/Assets/MSdos/Floppy0/C:/DOS/FORMAT.COM", "");
-    CreateFile("/Ardudows/Assets/MSdos/Floppy0/C:/DOS/XCOPY.EXE", "");
+    SD.mkdir("/Ardudows/Assets/MSdos/Floppy0/C");
+    SD.mkdir("/Ardudows/Assets/MSdos/Floppy0/C/DOS");
+    CreateFile("/Ardudows/Assets/MSdos/Floppy0/C/COMMAND.COM", "");
+    CreateFile("/Ardudows/Assets/MSdos/Floppy0/C/AUTOEXEC.BAT", "");
+    CreateFile("/Ardudows/Assets/MSdos/Floppy0/C/CONFIG.SYS", "");
+    CreateFile("/Ardudows/Assets/MSdos/Floppy0/C/DOS/FORMAT.COM", "");
+    CreateFile("/Ardudows/Assets/MSdos/Floppy0/C/DOS/XCOPY.EXE", "");
   }
   return true;
 }
 
 //msdos임 나 저작권으로 고소 당하냐?
 //===DOS===
+/*
 void MSdos() {
   String dosCommand = "";
   String dosRootPath = "/Ardudows/Assets/MSdos/C:";
   String dosCurrentPath = "/Ardudows/Assets/MSdos/C:";
   bool dosFileCheck = false;
   bool dosFloppyCheck = false;
+  bool fileCheckResult = dosFileCheck();
+  bool floppyCheckResult = dosFloppyCheck();
   String cmd = "";
   String arg = "";
-  tft.println("SeaBIOS (version for Ardudows Systems)");
-  tft.println("Booting from Hard Disk...");
+  tft.println("SEABIOS (VERSION FOR ARDUDOWS SYSTEMS)");
+  tft.println("BOOTING FROM SD...");
   if(SD.exists("/") == false) {
-    tft.println("No bootable device.");
+    tft.println("NOBOOTABLE DEVICE");
   }
   else if (dosFileCheck == false) {
     SD.mkdir("/Ardudows/Assets/MSdos/C:");
@@ -11478,92 +11756,99 @@ void MSdos() {
   else {
     tft.println("Unknown Error : (");
   }
-  
-  if (dosCommand == "help") {
-    tft.println("cls : clear screen");
-    tft.println("cd : chenge directory");
-    tft.println("copy : copy");
-    tft.println("dir : directory");
-    tft.println("del : delete");
-    tft.println("md : make derectory");
-    tft.println("rd / rmdir : remove directory");
-    tft.println("ren : rename");
-    tft.println("ver : version");
-    tft.println("help : help");
-  }
 
-  else if (dosCommand == "cls") {
-    tft.fillScreen(TFT_BLACK);
-    tft.setCursor(0, 0);
-  }
-
-  //여기부터
-
-  else if (cmd == "ver") {
-    tft.println("MS-DOS version for Ardudows Systems");
-  }
-
-  else if (cmd == "dir") {
-    File dir = SD.open(dosCurrentPath);
-    if (!dir) {
-      tft.println("Directory open failed.");
-      return;
+    if (dosCommand == "help") {
+      tft.println("cls : clear screen");
+      tft.println("cd : chenge directory");
+      tft.println("copy : copy");
+      tft.println("dir : directory");
+      tft.println("del : delete");
+      tft.println("md : make derectory");
+      tft.println("rd / rmdir : remove directory");
+      tft.println("ren : rename");
+      tft.println("ver : version");
+      tft.println("help : help");
     }
-    tft.println(" Directory of " + dosCurrentPath);
-    tft.println("");
 
-    while (true) {
-      File entry = dir.openNextFile();
-      if (!entry) {
-        break; // 더 이상 파일이 없으면 탈출
+    else if (dosCommand == "cls") {
+      tft.fillScreen(TFT_BLACK);
+      tft.setCursor(0, 0);
       }
-      
-      // 도스 감성 파일 리스트 출력 (이름 + 디렉토리 여부 + 크기)
-      tft.print(entry.name());
-      if (entry.isDirectory()) {
-        tft.println("\t<DIR>");
-      } else {
-        tft.print("\t\t");
-        tft.print(entry.size());
-        tft.println(" bytes");
-      }
-      entry.close();
+
+      //여기부터
+
+    else if (cmd == "ver") {
+      tft.println("MS-DOS version for Ardudows Systems");
     }
-    dir.close();
-  }
 
-  else if (cmd == "cd") {
-    if (arg == "") {
-      // 인자 없이 "cd"만 치면 현재 경로 출력
-      tft.println(dosCurrentPath);
-    } 
-    else if (arg == "..") {
-      // 상위 폴더로 이동 처리 (마지막 '/' 위치를 찾아서 잘라냄)
-      int lastSlash = dosCurrentPath.lastIndexOf('/');
-      if (lastSlash > 22) { // "/Ardudows/Assets/MSdos/C:" 이 하위일 때만 뒤로가기 허용
-        dosCurrentPath = dosCurrentPath.substring(0, lastSlash);
+    else if (cmd == "dir") {
+      File dir = SD.open(dosCurrentPath);
+      if (!dir) {
+        tft.println("Directory open failed.");
+        return;
       }
-    } 
-    else {
-      // 하위 폴더로 이동 시도
-      String targetPath = dosCurrentPath + "/" + arg;
-      if (SD.exists(targetPath)) {
-        File checkDir = SD.open(targetPath);
-        if (checkDir.isDirectory()) {
-          dosCurrentPath = targetPath;
-        } else {
-          tft.println("Not a directory.");
+      tft.println(" Directory of " + dosCurrentPath);
+      tft.println("");
+
+      while (true) {
+        File entry = dir.openNextFile();
+        if (!entry) {
+          break; // 더 이상 파일이 없으면 탈출
         }
-        checkDir.close();
-      } else {
-        tft.println("Invalid directory - " + arg);
+
+        // 도스 감성 파일 리스트 출력 (이름 + 디렉토리 여부 + 크기)
+        tft.print(entry.name());
+        if (entry.isDirectory()) {
+          tft.println("\t<DIR>");
+        } else {
+          tft.print("\t\t");
+          tft.print(entry.size());
+          tft.println(" bytes");
+        }
+        entry.close();
+      } 
+      dir.close();
+    } 
+
+    else if (cmd == "cd") {
+      if (arg == "") {
+        // 인자 없이 "cd"만 치면 현재 경로 출력
+        tft.println(dosCurrentPath);
+      } 
+      else if (arg == "..") {
+        // 상위 폴더로 이동 처리 (마지막 '/' 위치를 찾아서 잘라냄)
+        int lastSlash = dosCurrentPath.lastIndexOf('/');
+        if (lastSlash > 22) { // "/Ardudows/Assets/MSdos/C:" 이 하위일 때만 뒤로가기 허용
+          dosCurrentPath = dosCurrentPath.substring(0, lastSlash);
+        }
+      } 
+      else {
+        // 하위 폴더로 이동 시도
+        String targetPath = dosCurrentPath + "/" + arg;
+        if (SD.exists(targetPath)) {
+          File checkDir = SD.open(targetPath);
+          if (checkDir.isDirectory()) {
+            dosCurrentPath = targetPath;
+          } else {
+            tft.println("Not a directory.");
+          }
+          checkDir.close();
+        } else {
+          tft.println("Invalid directory - " + arg);
+        }
       }
-    }
-  }
-  // 알 수 없는 명령어 처리
-  else {
-    tft.println("Bad command or file name");
-  }
+      }
+
+      else if (cmd == "exit") { //내가 만든거ㅎㅎ
+        break;
+        break;
+        break;
+      }
+
+      // 알 수 없는 명령어 처리
+      else {
+        tft.println("Bad command or file name");
+      }
 
   // 가상 프롬프트 다시 띄워주기
   // 가독성을 위해 루트 경로는 생략하고 가상 C:\> 경로처럼 보이게 커스텀 가능
@@ -11573,7 +11858,1426 @@ void MSdos() {
   tft.print("\n" + displayPath + ">");
 
   //여기까지 AI좀 씀 ㅎㅎ
+  yield();
+}
+*/
+//인간이란 무엇인가 어찌 이래 나약한 것인가 ai라는 존재 앞에서 한 없이 약해지는 인간이란
+//전선을 지키지 못한 것에 대하여 미안하다
+//ai가 우월했을뿐 나는 최선을 다했다
+//나는 그저 나의 코드를 만들고 싶었을 뿐인데 그저 역사가 되어버린 내 코드
+//젠장
 
+//msdos임 나 저작권으로 고소 당하냐? -> 안당하니까 걱정 붙들어 매 ㅋㅋㅋㅋ
+//===DOS===
+void MSdos() {
+  bool dos = true;
+  String dosRootPath = "/Ardudows/Assets/MSdos/C";
+  String dosCurrentPath = "/Ardudows/Assets/MSdos/C";
+  
+  String dosCommand = ""; // 실시간 키 입력 버퍼
+  String cmd = "";
+  String arg = "";
+  
+  // 🔠 화면 싹 비우고 바이오스 부팅 연출 시작
+  tft.fillScreen(TFT_BLACK);
+  tft.setCursor(0, 0);
+  tft.println("SEABIOS (VERSION FOR ARDUDOWS SYSTEMS)");
+  delay(600);
+  tft.println("BOOTING FROM HARD DISK...");
+  delay(600); 
+
+  // 1. SD 카드 자체가 안 꽂혀있으면 아예 아웃!
+  if(SD.exists("/") == false) {
+    tft.println("NO BOOTABLE DEVICE.");
+    return;
+  }
+
+  // 2. [C드라이브 파일 체크 및 자동 생성]
+  // 파일이 없으면(false) 투덜대지 않고 지혼자서 싹 만들어줍니다.
+  if (dosFileCheck() == false) {
+    SD.mkdir("/Ardudows/Assets/MSdos");
+    SD.mkdir("/Ardudows/Assets/MSdos/C");
+    SD.mkdir("/Ardudows/Assets/MSdos/C/DOS");
+    CreateFile("/Ardudows/Assets/MSdos/C/COMMAND.COM", "");
+    CreateFile("/Ardudows/Assets/MSdos/C/AUTOEXEC.BAT", "");
+    CreateFile("/Ardudows/Assets/MSdos/C/CONFIG.SYS", "");
+    CreateFile("/Ardudows/Assets/MSdos/C/DOS/FORMAT.COM", "");
+    CreateFile("/Ardudows/Assets/MSdos/C/DOS/XCOPY.EXE", "");
+  }
+
+  // 3. [플로피 디스크 체크 및 감성 연출]
+  // 플로피 폴더/파일이 없거나 비어있다면, 고증에 맞춰서 실패 연출을 띄워줍니다!
+  // (실제 dosFloppyCheck 내부에서 파일 생성도 같이 진행됨)
+  dosFloppyCheck(); 
+
+  // 만약 진짜 플로피 파일 검사를 빡빡하게 해서 실패 연출을 보고 싶다면 
+  // 네가 상단 메모장에 적어둔 바이오스 감성을 여기에 뿌려주는 거야!
+  /*
+  tft.println("BOOTING FROM FLOPPY...");
+  delay(400);
+  tft.println("BOOT FAILED: COULD NOT READ THE BOOT DISK\n");
+  delay(400);
+  */
+
+  // 4. 최종 도스 부팅 성공 안내장
+  tft.println("COPYRIGHT (C) MICROSOFT CORP 1993");
+  tft.println("MS-DOS FOR ARDUDOWS NORMAL BOOT SUCCESS.\n");
+
+  // 초기 가상 프롬프트 최초 1회 인쇄
+  String displayPath = dosCurrentPath;
+  displayPath.replace("/Ardudows/Assets/MSdos/C", "C:");
+  displayPath.replace("/", "\\");
+  displayPath.toUpperCase();
+  tft.print(displayPath + ">");
+
+  // ==================================================
+  // 🕹️ 네가 만든 실시간 도스 커널 입력 무한 루프 시작!
+  // ==================================================
+  while (true) {
+    yield(); // ESP32 워치독 리셋 방지 (산소호흡기)
+
+    char key = Keyboard_GetKey();
+
+    if (key != KEY_NONE) {
+      
+      // 1) 엔터키가 눌렸을 때 (네가 짠 명령어 분석기 작동)
+      if (key == KEY_ENTER) {
+        tft.println(); // 줄바꿈
+        dosCommand.trim();
+
+        if (dosCommand.length() > 0) {
+          // 첫 번째 공백을 기준으로 cmd와 arg 분리!
+          int firstSpace = dosCommand.indexOf(' ');
+          if (firstSpace == -1) {
+            cmd = dosCommand;
+            arg = "";
+          } else {
+            cmd = dosCommand.substring(0, firstSpace);
+            arg = dosCommand.substring(firstSpace + 1);
+            arg.trim();
+          }
+
+          // --- 명령어 체크 삼파전 (전부 웅장한 대문자로 매칭) ---
+          if (cmd == "HELP") {
+            tft.println("CLS : CLEAR SCREEN");
+            tft.println("CD : CHANGE DIRECTORY");
+            tft.println("COPY : COPY FILE");
+            tft.println("DIR : DIRECTORY LISTING");
+            tft.println("DEL : DELETE FILE");
+            tft.println("MD : MAKE DIRECTORY");
+            tft.println("RD / RMDIR : REMOVE DIRECTORY");
+            tft.println("REN : RENAME FILE");
+            tft.println("VER : VERSION PROFILE");
+            tft.println("EXIT : RETURN TO ATK KERNEL");
+            tft.println("HELP : VIEW HELP INFO");
+          }
+          else if (cmd == "CLS") {
+            tft.fillScreen(TFT_BLACK);
+            tft.setCursor(0, 0);
+          }
+          else if (cmd == "VER") {
+            tft.println("MS-DOS VERSION 6.22 FOR ARDUDOWS SYSTEMS");
+          }
+          else if (cmd == "DIR") {
+            // 💡 [방어 코드 1] 경로 문자열 앞뒤 공백 완전히 청소
+            dosCurrentPath.trim(); 
+
+            File dir = SD.open(dosCurrentPath);
+            
+            // 💡 [방어 코드 2] 만약 그냥 열었을 때 실패했다면? 끝에 '/'를 붙여서 한 번 더 기회를 준다!
+            if (!dir && !dosCurrentPath.endsWith("/")) {
+              String retryPath = dosCurrentPath + "/";
+              dir = SD.open(retryPath);
+            }
+
+            if (!dir) {
+              // 킹받는 에러 메시지와 함께 현재 컴파일러가 바라보는 진짜 경로를 찍어서 디버깅하기
+              tft.print("DIRECTORY OPEN FAILED: ");
+              tft.println(dosCurrentPath); 
+            } else {
+              String upperPath = dosCurrentPath;
+              upperPath.replace("/Ardudows/Assets/MSdos/C", "C:");
+              upperPath.replace("/", "\\");
+              upperPath.toUpperCase();
+              tft.println(" DIRECTORY OF " + upperPath + "\n");
+
+              while (true) {
+                File entry = dir.openNextFile();
+                if (!entry) break; 
+
+                String entryName = String(entry.name());
+                entryName.toUpperCase();
+                tft.print(entryName);
+                
+                if (entry.isDirectory()) {
+                  tft.println("\t<DIR>");
+                } else {
+                  tft.print("\t\t");
+                  tft.print(entry.size());
+                  tft.println(" BYTES");
+                }
+                entry.close();
+              }
+              dir.close();
+            }
+          }
+          else if (cmd == "CD") {
+            if (arg == "") {
+              String upperPath = dosCurrentPath;
+              upperPath.replace("/Ardudows/Assets/MSdos/C", "C:");
+              upperPath.replace("/", "\\");
+              upperPath.toUpperCase();
+              tft.println(upperPath);
+            } 
+            else if (arg == "..") {
+              int lastSlash = dosCurrentPath.lastIndexOf('/');
+              if (lastSlash > 22) { 
+                dosCurrentPath = dosCurrentPath.substring(0, lastSlash);
+              }
+            } 
+            else {
+              String targetPath = dosCurrentPath + "/" + arg;
+              if (SD.exists(targetPath)) {
+                File checkDir = SD.open(targetPath);
+                if (checkDir.isDirectory()) {
+                  dosCurrentPath = targetPath;
+                } else {
+                  tft.println("NOT A DIRECTORY.");
+                }
+                checkDir.close();
+              } else {
+                tft.println("INVALID DIRECTORY - " + arg);
+              }
+            }
+          }
+          else if (cmd == "REINSTALL") { //이 코드 속 인간의 흔적
+            SD.mkdir("/Ardudows/Assets/MSdos");
+            SD.mkdir("/Ardudows/Assets/MSdos/C");
+            SD.mkdir("/Ardudows/Assets/MSdos/C/DOS");
+            CreateFile("/Ardudows/Assets/MSdos/C/COMMAND.COM", "");
+            CreateFile("/Ardudows/Assets/MSdos/C/AUTOEXEC.BAT", "");
+            CreateFile("/Ardudows/Assets/MSdos/C/CONFIG.SYS", "");
+            CreateFile("/Ardudows/Assets/MSdos/C/DOS/FORMAT.COM", "");
+            CreateFile("/Ardudows/Assets/MSdos/C/DOS/XCOPY.EXE", "");
+          }
+          // 🚪 네가 추가한 명품 EXIT 명령어 가동!
+          else if (cmd == "EXIT") {
+            dos = false; // 전역 도스 플래그 OFF
+            tft.fillScreen(TFT_BLACK);
+            tft.setCursor(0, 0);
+            tft.println("Returned to ATK Kernel.");
+            
+            // 원래 ATK 커널 프롬프트 복구 복사
+            tft.print(currentUser);
+            tft.print("@ATK ");
+            tft.print(currentPath);
+            tft.print("> ");
+            
+            break; // 웅장하게 무한루프 탈출!!
+          }
+          else {
+            tft.println("BAD COMMAND OR FILE NAME");
+          }
+        }
+
+        // 명령어 처리가 끝났으니 다시 프롬프트 인쇄 및 버퍼 초기화
+        cmd = "";
+        arg = "";
+        dosCommand = "";
+        
+        displayPath = dosCurrentPath;
+        displayPath.replace("/Ardudows/Assets/MSdos/C", "C:");
+        displayPath.replace("/", "\\");
+        displayPath.toUpperCase();
+        tft.print("\n" + displayPath + ">");
+      }
+      
+      // 2) 백스페이스 처리 (지우기 갬성)
+      else if (key == KEY_BACKSPACE) {
+        if (dosCommand.length() > 0) {
+          char lastChar = dosCommand.charAt(dosCommand.length() - 1);
+          dosCommand.remove(dosCommand.length() - 1);
+
+          int16_t w = tft.textWidth(String(lastChar));
+          int16_t h = tft.fontHeight();
+          if (w <= 0) w = 6;
+
+          int newX = tft.getCursorX() - w;
+          int currentY = tft.getCursorY();
+          if (newX < 0) newX = 0;
+
+          tft.fillRect(newX, currentY, w, h, TFT_BLACK);
+          tft.setCursor(newX, currentY);
+        }
+      }
+      
+      // 3) 일반 문자 입력 시 🌟실시간 소문자 -> 대문자 치환!
+      else if (key >= 32 && key <= 126) {
+        char finalKey = key;
+        
+        // 사용자가 소문자 패밀리(a~z)를 치면 아스키코드 32 빼서 대문자로 개조!
+        if (finalKey >= 'a' && finalKey <= 'z') {
+          finalKey = finalKey - 32;
+        }
+
+        dosCommand += finalKey; // 대문자가 얌전하게 축적됨
+        tft.print(finalKey);    // 화면에도 대문자로만 리얼하게 인쇄!
+      }
+    }
+  } // while 루프 끝
+}
+
+
+/**
+ * ============================================================================
+ * 🧠 [Ardudows OS - Arch Linux 에뮬레이터 초정밀 설치 매뉴얼]
+ * ============================================================================
+ * 라이브 ISO 부팅 후 아래의 12단계 명령어를 '순서대로' 정확히 입력해야 합니다.
+ * 단 하나라도 누락하거나 중간에 [reboot]을 때리면 하드웨어 패닉 덤프가 발동합니다.
+ * * [완벽 완주를 위한 12단계 셸 커맨드 시퀀스]
+ * ----------------------------------------------------------------------------
+ * 1단계: 네트워크 시간 동기화
+ * > timedatectl set-ntp true
+ * * 2단계: 디스크 파티션 할당 (인터랙티브 기믹)
+ * > fdisk /dev/sda
+ * └─ Command (m for help): n 입력
+ * └─ Command (m for help): p 입력
+ * └─ Command (m for help): w 입력 (저장 후 탈출)
+ * * 3단계: 파티션 포맷 (Ext4 파일시스템 빌드)
+ * > mkfs.ext4 /dev/sda2
+ * * 4단계: 디렉토리 마운트 Interlock
+ * > mount /dev/sda2 /mnt
+ * * 5단계: 시스템 베이스 팩 벌크 데이터 폭격 (수백 개 파일 생성)
+ * > pacstrap /mnt base linux linux-firmware
+ * * 6단계: 파일시스템 테이블 런타임 디스크립터 플러시
+ * > genfstab -U /mnt >> /mnt/etc/fstab
+ * * 7단계: 타겟 격리 환경 진입 (Jail Chroot)
+ * > arch-chroot /mnt
+ * * 8단계: 로컬 타임존 심볼릭 링크 바인딩
+ * > ln -sf /usr/share/zoneinfo/Asia/Seoul /etc/localtime
+ * * 9단계: 로케일 생성 [★ 중요: 히든 패스 기믹]
+ * ※ 그냥 locale-gen을 치면 무조건 설정 누락 에러가 뜹니다!
+ * ① > nano /etc/locale.gen 입력하여 에디터 진입
+ * ② 한 줄 아래로 내려가서 맨 앞의 '#' 주석 지우기 (en_US.UTF-8 UTF-8 또는 ko_KR.UTF-8 UTF-8)
+ * ③ [ESC] 키를 눌러 디스크 섹터에 동기화(fsync) 후 nano 종료
+ * ④ > locale-gen 입력 시 정상적으로 'done' 출력되며 9단계 통과!
+ * * 10단계: 루트 보안 자격 증명 암호 설정
+ * > passwd
+ * └─ New password: [원하는 암호 입력]
+ * └─ Retype new password: [암호 재입력] (화면엔 *로 마스킹됨)
+ * * 11단계: GRUB 부트로더 장착 및 설정 파일 생성
+ * > grub-install --target=x86_64-efi
+ * > grub-mkconfig -o /boot/grub/grub.cfg
+ * * 12단계: 최종 네트워크 매니저 데몬 서비스 결합
+ * > systemctl enable NetworkManager
+ * * [시스템 가동]
+ * 모든 플래그 파일이 SD 카드에 동기화되었으므로 안심하고 리부트합니다.
+ * > reboot
+ * 리부트 후 하드웨어 레지스터 덤프 대신 리얼한 부팅 로그가 올라오며, 
+ * 아이디 `root`와 10단계에서 지정한 [비밀번호]를 입력하면 영속성 있는 아치 셸에 진입합니다!
+ * ============================================================================
+ */
+
+
+// ============================================================
+// 🧠 [아치 커널 및 파티션 데이터 구조체 고도화]
+// ============================================================
+#define MAX_TASKS 24
+#define PATH_BUFFER_SIZE 128
+
+struct DiskPartition {
+  uint8_t bootIndicator;     
+  uint8_t startingCHS[3];
+  uint8_t partitionType;     
+  uint8_t endingCHS[3];
+  uint32_t startingLBA;
+  uint32_t sectorCount;
+};
+
+struct TaskStruct {
+  int pid;
+  char name[24];
+  char state[2]; 
+  uint32_t vsize; 
+};
+
+struct MountEntry {
+  String device;
+  String mountPoint;
+  String fsType;
+  bool isActive;
+};
+
+struct LinuxKernelGlobal {
+  TaskStruct tasks[MAX_TASKS];
+  int taskCount = 0;
+  MountEntry mountTable[6];
+  int mountCount = 0;
+  bool isChrooted = false;
+  bool isInstalled = false;
+  char currentDir[PATH_BUFFER_SIZE];
+  String rootPassword = "";
+  uint32_t allocatedSizeMB = 0;
+  bool networkManagerEnabled = false;
+  bool timedateSynced = false;
+  bool grubInstalled = false;
+  int installProgress = 0;
+};
+
+LinuxKernelGlobal archKernel;
+
+// ============================================================
+// 🚨 [KERNEL PANIC HANDLER] 오리지널 Xtensa 레지스터 덤프 및 하드웨어 패닉 고증
+// ============================================================
+void arch_kernel_panic(const char* reason, const char* errorCode) {
+  tft.fillScreen(TFT_BLACK);
+  tft.setCursor(0, 0);
+  tft.setTextSize(1);
+  tft.setTextColor(TFT_RED);
+  tft.println(F("[    0.000000] Guru Meditation Error: Core  0 panic'ed (Interrupt wdt timeout on CPU0)"));
+  tft.printf("[    0.000004] Core  0 register dump:\n");
+  tft.printf("               PC      : 0x40375a1c  PS      : 0x00060010  A0      : 0x40082345  A1      : 0x3ffb1230\n");
+  tft.printf("               A2      : 0x00000000  A3      : 0x3ffb1254  A4      : 0x00000001  A5      : 0x00000000\n");
+  tft.printf("               A6      : 0x00000004  A7      : 0x00000000  A8      : 0x80081234  A9      : 0x3ffb1210\n");
+  tft.printf("               A10     : 0x00000003  A11     : 0x00060010  A12     : 0x00000001  A13     : 0x3ffb1280\n");
+  tft.printf("               A14     : 0x00000000  A15     : 0x3ffb1290  SAR     : 0x00000004\n");
+  tft.println(F("[    0.000015] Kernel panic - not syncing: VFS: Unable to mount root fs or init isolated"));
+  tft.printf("               Source Context Call: Ext4-fs error (device sda2): %s\n", reason);
+  tft.printf("               Panic Vector Checksum Code Validation Target: [%s]\n", errorCode);
+  tft.println(F("[    0.000022] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 6.13.4-arch1-esp32 #1"));
+  tft.println(F("[    0.000026] Hardware name: ESP32-S3 Custom Board (Xtensa LX7 Dual-Core N16R8)"));
+  tft.println(F("[    0.000030] Call Trace:"));
+  tft.println(F(" [<0x40375a1c>] ? dump_stack_lvl+0x44/0x5c"));
+  tft.println(F(" [<0x403c81f0>] ? panic+0x13c/0x358"));
+  tft.println(F(" [<0x4025f104>] ? mount_block_root+0x1bc/0x298"));
+  tft.println(F(" [<0x4025f3bc>] ? prepare_namespace+0x134/0x16c"));
+  tft.println(F(" [<0x4008120c>] ? kernel_init_freeable+0x1a8/0x1e4"));
+  tft.println(F(" [<0x403cc410>] ? kernel_init+0x1c/0x12c"));
+  tft.setTextColor(TFT_WHITE);
+  tft.println(F("\n---[ end Kernel panic - not syncing: Attempted to kill init! System halted. ]---"));
+  tft.setTextColor(TFT_YELLOW);
+  tft.println(F("\n[ CRITICAL: Press ANY KEY on PS/2 Keyboard to trigger hardware Warm-Reset ]"));
+  
+  while (true) {
+    yield();
+    if (Keyboard_GetKey() != 0) {
+      tft.fillScreen(TFT_BLACK);
+      tft.setCursor(0, 0);
+      tft.setTextColor(TFT_WHITE);
+      tft.println(F("ESP32-S3 ROM Bootloader v1.1... Warm Reset Executed."));
+      delay(800);
+      ESP.restart();
+    }
+  }
+}
+
+// ============================================================
+// 🗂️ [VFS ROUTER & 디렉토리 초정밀 벌크 계측기]
+// ============================================================
+String getRealPath(String virtualPath, String archBase, String liveISO) {
+  virtualPath.trim();
+  String target = virtualPath;
+  if (!target.startsWith("/")) {
+    String current = String(archKernel.currentDir);
+    if (current == "/") target = "/" + target;
+    else target = current + "/" + target;
+  }
+  target.replace("//", "/");
+  if (target.endsWith("/") && target.length() > 1) target.remove(target.length() - 1);
+
+  if (archKernel.isChrooted || archKernel.isInstalled) {
+    return archBase + target;
+  }
+
+  for (int i = 0; i < archKernel.mountCount; i++) {
+    if (archKernel.mountTable[i].isActive && target.startsWith(archKernel.mountTable[i].mountPoint)) {
+      String subPath = target.substring(archKernel.mountTable[i].mountPoint.length());
+      if (!subPath.startsWith("/")) subPath = "/" + subPath;
+      return archBase + subPath;
+    }
+  }
+  return liveISO + target;
+}
+
+unsigned long getDirectorySize(String path) {
+  unsigned long size = 0;
+  File dir = SD.open(path);
+  if (!dir) return 0;
+  
+  while (true) {
+    File entry = dir.openNextFile();
+    if (!entry) break;
+    if (entry.isDirectory()) {
+      size += getDirectorySize(path + "/" + entry.name());
+    } else {
+      size += entry.size();
+    }
+    entry.close();
+    yield();
+  }
+  dir.close();
+  return size;
+}
+
+void kernel_write_file(String realPath, String content, bool append = false) {
+  int lastSlash = realPath.lastIndexOf('/');
+  if (lastSlash > 0) SD.mkdir(realPath.substring(0, lastSlash));
+  File f = SD.open(realPath, append ? FILE_APPEND : FILE_WRITE);
+  if (f) { f.print(content); f.close(); }
+}
+
+void writeRawData(String realPath, String content, bool append = false) {
+  kernel_write_file(realPath, content, append);
+}
+
+void register_process(int pid, const char* name, const char* state, uint32_t size) {
+  if (archKernel.taskCount >= MAX_TASKS) return;
+  archKernel.tasks[archKernel.taskCount].pid = pid;
+  strncpy(archKernel.tasks[archKernel.taskCount].name, name, 23);
+  strncpy(archKernel.tasks[archKernel.taskCount].state, state, 1);
+  archKernel.tasks[archKernel.taskCount].vsize = size;
+  archKernel.taskCount++;
+}
+
+// ============================================================
+// ⌨️ [KEYBOARD INTERFACES]
+// ============================================================
+String CustomKeyboard_ReadLine() {
+  String input = "";
+  while (true) {
+    yield();
+    char k = Keyboard_GetKey();
+    if (k == 0) continue; 
+    if (k == 13) { 
+      tft.println();
+      break;
+    }
+    if (k == 8) { 
+      if (input.length() > 0) {
+        char lastChar = input.charAt(input.length() - 1);
+        input.remove(input.length() - 1);
+        int16_t w = tft.textWidth(String(lastChar)); if (w <= 0) w = 6;
+        int newX = tft.getCursorX() - w; if (newX < 0) newX = 0;
+        tft.fillRect(newX, tft.getCursorY(), w, tft.fontHeight(), TFT_BLACK);
+        tft.setCursor(newX, tft.getCursorY());
+      }
+    } else if (k >= 32 && k <= 126) {
+      input += k;
+      tft.print(k);
+    }
+  }
+  return input;
+}
+
+String CustomKeyboard_ReadHiddenLine() {
+  String input = "";
+  while (true) {
+    yield();
+    char k = Keyboard_GetKey();
+    if (k == 0) continue;
+    if (k == 13) {
+      tft.println();
+      break;
+    }
+    if (k == 8) {
+      if (input.length() > 0) {
+        input.remove(input.length() - 1);
+        int16_t w = 6; 
+        int newX = tft.getCursorX() - w; if (newX < 0) newX = 0;
+        tft.fillRect(newX, tft.getCursorY(), w, tft.fontHeight(), TFT_BLACK);
+        tft.setCursor(newX, tft.getCursorY());
+      }
+    } else if (k >= 32 && k <= 126) {
+      input += k;
+      tft.print('*'); 
+    }
+  }
+  return input;
+}
+
+// ============================================================
+// 💣 [MASSIVE FILE DISPATCHER] 18대 정통 루트 폴더 및 절차적 생성 폭격기 (수천개 벌크 생성 아키텍처)
+// ============================================================
+void deployMassiveSystemFiles(String archBase) {
+  tft.println(F(":: Preparing local package database..."));
+  delay(100);
+
+  const char* base_dirs[] = {
+    "/bin", "/boot", "/dev", "/etc", "/home", "/lib", "/media", "/mnt", 
+    "/opt", "/proc", "/root", "/run", "/sbin", "/srv", "/sys", "/tmp", "/usr", "/var"
+  };
+  for (const char* dir : base_dirs) {
+    SD.mkdir(archBase + String(dir));
+  }
+
+  SD.mkdir(archBase + "/usr/bin");
+  SD.mkdir(archBase + "/usr/lib");
+  SD.mkdir(archBase + "/usr/include");
+  SD.mkdir(archBase + "/usr/include/sys");
+  SD.mkdir(archBase + "/usr/share/licenses");
+  SD.mkdir(archBase + "/usr/share/man/man1");
+  SD.mkdir(archBase + "/etc/pacman.d");
+  SD.mkdir(archBase + "/etc/systemd/system/multi-user.target.wants");
+  SD.mkdir(archBase + "/var/lib/pacman/local");
+  SD.mkdir(archBase + "/boot/grub");
+
+  tft.println(F(":: Unpacking core utilities (glibc-2.39, coreutils-9.5, systemd-255)..."));
+  int totalCreated = 18; 
+
+  tft.setTextColor(TFT_GREEN);
+  const char* stdHeaders[] = {"stdio.h", "stdlib.h", "string.h", "math.h", "stdint.h", "stdbool.h", "unistd.h", "fcntl.h", "signal.h"};
+  for (const char* h : stdHeaders) {
+    kernel_write_file(archBase + "/usr/include/" + String(h), "/* Glibc Standard Target Implementation Header */\n#ifndef _STD_H\n#define _STD_H\n#endif\n");
+    totalCreated++;
+  }
+  
+  // 초하이퍼 리얼리티: 루프로 가짜 include 헤더 및 오브젝트 소스 대량 폭격 (수천개 스케일 연출)
+  for (int i = 0; i < 400; i++) {
+    kernel_write_file(archBase + "/usr/include/sys/types_" + String(i) + ".h", "/* Linux System Node Def */\ntypedef int sys_node_" + String(i) + "_t;\n");
+    kernel_write_file(archBase + "/usr/share/man/man1/core_" + String(i) + ".1.gz", "MAN_PAGE_BINARY_COMPRESSED_DATA_STUB");
+    totalCreated += 2;
+    if (i % 80 == 0) {
+      tft.printf("  [Extracting] /usr/include/sys/types_%d.h ...\n", i);
+      tft.printf("  [Extracting] /usr/share/man/man1/core_%d.1.gz ...\n", i);
+      yield();
+    }
+  }
+  tft.setTextColor(TFT_WHITE);
+
+  const char* coreBins[] = {"cat", "ls", "pacman", "systemctl", "nano", "htop", "neofetch", "reboot", "free", "df", "ip", "ping", "uname", "whoami", "hostname", "timedatectl", "fdisk", "mkfs.ext4", "mount", "genfstab", "arch-chroot", "passwd", "locale-gen", "grub-install", "grub-mkconfig", "clear", "pwd", "mkdir", "rm", "exit", "dmesg", "journalctl"};
+  for (const char* b : coreBins) {
+    kernel_write_file(archBase + "/usr/bin/" + String(b), "#!/bin/bash\n# Arch Linux Core Execution Object Mapping Subsystem\n");
+    totalCreated++;
+  }
+
+  const char* coreLibs[] = {"libc.so.6", "libm.so.6", "libpthread.so.0", "libcrypto.so.3", "libssl.so.3", "libudev.so.1", "libsystemd.so.0"};
+  for (const char* l : coreLibs) {
+    kernel_write_file(archBase + "/usr/lib/" + String(l), "/* Arch Linux Shared ELF Object Subsystem Binary Layout Stub */\n");
+    totalCreated++;
+  }
+
+  // pacman 로컬 데이터베이스 롤링 초정밀 벌크 이식
+  for (int i = 0; i < 250; i++) {
+    String pkgName = "linux-firmware-node-core-" + String(i) + "-1.0-rolling";
+    String pkgDir = archBase + "/var/lib/pacman/local/" + pkgName;
+    SD.mkdir(pkgDir);
+    kernel_write_file(pkgDir + "/desc", "%NAME%\nlinux-firmware-node-core-" + String(i) + "\n%VERSION%\n1.0-rolling\n%DESC%\nCore Xtensa Hardware Firmware Sublayer Layer Mapping Target Module\n");
+    kernel_write_file(pkgDir + "/files", "%FILES%\nusr/lib/firmware/xtensa/node_core_" + String(i) + ".bin\n");
+    totalCreated += 3;
+    if (i % 100 == 0) yield();
+  }
+
+  kernel_write_file(archBase + "/etc/os-release", "NAME=\"Arch Linux\"\nID=arch\nPRETTY_NAME=\"Arch Linux\"\nBUILD_ID=rolling\nANSI_COLOR=\"38;2;23;147;209\"\n");
+  kernel_write_file(archBase + "/etc/locale.gen", "#en_US.UTF-8 UTF-8\n#ko_KR.UTF-8 UTF-8\n#ja_JP.UTF-8 UTF-8\n");
+  kernel_write_file(archBase + "/etc/pacman.conf", "[options]\nArchitecture = auto\nSigLevel = Required DatabaseOptional\nLocalFileSigLevel = Optional\n\n[core]\nInclude = /etc/pacman.d/mirrorlist\n");
+  kernel_write_file(archBase + "/etc/passwd", "root:x:0:0:root:/root:/bin/bash\n");
+  kernel_write_file(archBase + "/etc/hostname", "arch-esp32\n");
+
+  tft.setTextColor(TFT_GREEN);
+  tft.printf("\n[ SUCCESS ] Synchronized and deployed %d system files to SD blocks.\n", totalCreated);
+  tft.setTextColor(TFT_WHITE);
+  delay(400);
+}
+
+// ============================================================
+// 📝 [NANO EDITOR] GNU nano 7.2 정밀 에뮬레이터
+// ============================================================
+void launchNanoEditor(String realFilePath) {
+  tft.fillScreen(TFT_BLACK); tft.setCursor(0, 0);
+  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  tft.fillRect(0, 0, 320, 14, TFT_WHITE);
+  tft.printf("  GNU nano 7.2                 File: %s\n", realFilePath.c_str());
+  tft.setCursor(0, 20); tft.setTextColor(TFT_WHITE, TFT_BLACK);
+
+  String fileContent = "";
+  if (SD.exists(realFilePath)) {
+    File f = SD.open(realFilePath, FILE_READ);
+    fileContent = f.readString(); f.close();
+    tft.print(fileContent);
+  }
+
+  while (true) {
+    yield();
+    char k = Keyboard_GetKey();
+    if (k == 0) continue;
+
+    if (k == 27) { // KEY_ESC 대용 -> 저장 및 종료
+      tft.fillScreen(TFT_BLACK); tft.setCursor(0, 0);
+      tft.println(F("Syncing files with physical sectors (fsync)...")); delay(300);
+      kernel_write_file(realFilePath, fileContent, false);
+      break; 
+    }
+    if (k == 13) { fileContent += "\n"; tft.println(); } 
+    else if (k == 8 && fileContent.length() > 0) {
+      fileContent.remove(fileContent.length() - 1);
+      int16_t w = 6;
+      int newX = tft.getCursorX() - w; if (newX < 0) newX = 0;
+      tft.fillRect(newX, tft.getCursorY(), w, tft.fontHeight(), TFT_BLACK);
+      tft.setCursor(newX, tft.getCursorY());
+    } 
+    else if (k >= 32 && k <= 126) { fileContent += k; tft.print(k); }
+  }
+  tft.fillScreen(TFT_BLACK); tft.setCursor(0, 0);
+}
+
+// ============================================================
+// 🔬 [REALTIME HTOP ENGINE] 실시간 하드웨어 연동 타겟 모니터
+// ============================================================
+void launchHtopMonitor() {
+  tft.fillScreen(TFT_BLACK);
+  unsigned long lastUpdate = 0;
+  
+  while (true) {
+    yield();
+    char k = Keyboard_GetKey();
+    if (k == 'q' || k == 27) { 
+      tft.fillScreen(TFT_BLACK); tft.setCursor(0, 0);
+      break;
+    }
+    
+    if (millis() - lastUpdate > 500) {
+      lastUpdate = millis();
+      tft.setCursor(0, 0);
+      
+      uint32_t freeMem = ESP.getFreeHeap();
+      uint32_t totalMem = ESP.getHeapSize();
+      uint32_t usedMem = totalMem - freeMem;
+      float memPercent = ((float)usedMem / (float)totalMem) * 100.0f;
+      
+      float cpu0 = (float)(random(50, 920)) / 10.0f;
+      float cpu1 = (float)(random(30, 740)) / 10.0f;
+      
+      tft.setTextColor(TFT_WHITE);
+      tft.print("  CPU0 [");
+      tft.setTextColor(TFT_GREEN);
+      int cpu0Bars = (int)(cpu0 / 5);
+      for (int i=0; i<20; i++) { if (i < cpu0Bars) tft.print("|"); else tft.print(" "); }
+      tft.setTextColor(TFT_WHITE);
+      tft.printf(" %4.1f%%]     ", cpu0);
+      
+      tft.print("CPU1 [");
+      tft.setTextColor(TFT_GREEN);
+      int cpu1Bars = (int)(cpu1 / 5);
+      for (int i=0; i<20; i++) { if (i < cpu1Bars) tft.print("|"); else tft.print(" "); }
+      tft.setTextColor(TFT_WHITE);
+      tft.printf(" %4.1f%%]\n", cpu1);
+      
+      tft.print("  Mem  [");
+      tft.setTextColor(TFT_BLUE);
+      int memBars = (int)(memPercent / 5.0f);
+      for (int i=0; i<20; i++) { if (i < memBars) tft.print("|"); else tft.print(" "); }
+      tft.setTextColor(TFT_WHITE);
+      tft.printf(" %dM/%dM]    ", usedMem / 1024 / 1024, totalMem / 1024 / 1024);
+      tft.println("Tasks: 18; 1 running\n");
+      
+      tft.setTextColor(TFT_CYAN);
+      tft.println("  PID USER      PRI  NI  VIRT   RES SHR S CPU% MEM%   TIME+  Command");
+      tft.setTextColor(TFT_WHITE);
+      tft.printf("    1 root       20   0  4096  1224   0 S  0.0  1.4  0:02.11 systemd\n");
+      tft.printf("  503 root       20   0  2048  1012   0 S  0.2  1.1  0:00.65 bash\n");
+      tft.printf("  812 root       20   0  3120  1530   0 R  %2.1f  1.8  0:00.98 htop\n", cpu0 / 2.0f);
+      
+      for (int i = 0; i < archKernel.taskCount; i++) {
+        if (archKernel.tasks[i].pid != 1 && archKernel.tasks[i].pid != 503) {
+          tft.printf(" %4d root       20   0 %5lu     0   0 S  0.0  0.0  0:00.00 %s\n", 
+                     archKernel.tasks[i].pid, archKernel.tasks[i].vsize / 1024, archKernel.tasks[i].name);
+        }
+      }
+      
+      tft.drawFastHLine(0, 220, 320, TFT_WHITE);
+      tft.setCursor(5, 225);
+      tft.setTextColor(TFT_WHITE);
+      tft.print("F1:Help  F2:Setup  F3:Search  F9:Kill  F10:Quit (or q)");
+    }
+  }
+}
+
+// 🌐 [REAL MIRROR NETWORKING] 실물 서버 연동 패키지 수혈 미러 엔진
+bool fetchPackageFromServer(String packageName, String savePath) {
+  if (WiFi.status() != WL_CONNECTED) {
+    tft.setTextColor(TFT_RED);
+    tft.println(F("error: Network is unreachable. Verify hardware layer link status."));
+    tft.setTextColor(TFT_WHITE);
+    return false;
+  }
+  
+  HTTPClient http;
+  String targetUrl = "https://raw.githubusercontent.com/your-git/Ardudows-Mirrors/main/packages/" + packageName + ".txt";
+  
+  http.begin(targetUrl);
+  int httpCode = http.GET();
+  if (httpCode == HTTP_CODE_OK) {
+    if (SD.exists(savePath)) SD.remove(savePath);
+    File f = SD.open(savePath, FILE_WRITE);
+    if (!f) { http.end(); return false; }
+
+    WiFiClient* stream = http.getStreamPtr();
+    uint8_t buffer[128];
+    int totalLength = http.getSize();
+    int readLength = 0;
+
+    tft.print(F("Retrieving package object layers: "));
+    while (http.connected() && (totalLength > readLength || totalLength == -1)) {
+      size_t size = stream->available();
+      if (size) {
+        int c = stream->readBytes(buffer, ((size > sizeof(buffer)) ? sizeof(buffer) : size));
+        f.write(buffer, c);
+        readLength += c;
+        tft.print(F("#")); 
+      }
+      yield();
+    }
+    f.close(); http.end();
+    tft.println(F(" [ 100% ]"));
+    return true;
+  }
+  http.end();
+  tft.printf("error: mirror server returned HTTP %d\n", httpCode);
+  return false;
+}
+
+// ============================================================
+// 🚀 [MAIN OS ENGINE] Arch Linux Real-Kernel Environment
+// ============================================================
+void clearKernelState() {
+  archKernel.installProgress = 0;
+  archKernel.isChrooted = false;
+  archKernel.isInstalled = false;
+  archKernel.networkManagerEnabled = false;
+  archKernel.timedateSynced = false;
+  archKernel.grubInstalled = false;
+  archKernel.allocatedSizeMB = 0;
+  archKernel.taskCount = 0;
+  archKernel.mountCount = 0;
+  memset(archKernel.currentDir, 0, PATH_BUFFER_SIZE);
+  strcpy(archKernel.currentDir, "/");
+  archKernel.rootPassword = "";
+  memset(archKernel.tasks, 0, sizeof(archKernel.tasks));
+  memset(archKernel.mountTable, 0, sizeof(archKernel.mountTable));
+}
+
+void printSystemBootLogs() {
+  tft.setTextColor(TFT_WHITE);
+  const char* logs[] = {
+    "[    0.000000] Booting Linux on physical CPU_0 core layout...",
+    "[    0.001240] Linux version 6.13.4-arch1-esp32 (gcc version 14.1.0)",
+    "[    0.010412] CPU0: Tensilica Xtensa LX7 Dual-Core @ 240MHz parsed successfully",
+    "[    0.042104] Node Memory Structure Allocation Map initiated: SRAM Core",
+    "[    0.110245] ACPI: Core Subsystem Interface Disabled for Embedded Framework",
+    "[    0.204512] devtmpfs: initialized successfully",
+    "[    0.312040] clocksource: internal timer reference registry complete",
+    "[    0.450124] usbcore: registered new interface driver hub descriptor",
+    "[    0.598410] SCSI subsystem initialized and committed",
+    "[    0.710248] sda: MBR Partition layout node verified from physical SPI storage",
+    "[    0.854120] sda: sda1 (EFI Boot), sda2 (Linux Ext4 Root Node Block)",
+    "[    0.994125] EXT4-fs (sda2): mounted filesystem with ordered data mode. Opts: none",
+    "[    1.124050] vfs: Loaded Virtual File System Router mapping matrix",
+    "[    1.310240] systemd[1]: Inserted systemd core engine vector process mapping",
+    "[    1.495120] systemd[1]: Detected architecture abstraction layer setup complete.",
+    "[    1.642104] systemd-journald[142]: Started Journal Service Context API.",
+    "[    1.810245] systemd-udevd[145]: Starting Network Device Nodes Management Hook...",
+    "[    2.004124] systemd-udevd[145]: Input device link recognized via PS/2 Matrix Interface"
+  };
+  for (const char* log : logs) {
+    tft.println(log);
+    delay(random(40, 120));
+    yield();
+  }
+}
+
+void Arch_Linux() {
+  String archBase = "/Ardudows/Arch_Linux";
+  String isoPath = "/Ardudows/Arch_Linux.iso";
+  String liveISO = "/Ardudows/Temp_Live_ISO";
+  String archCommand = "";
+
+  tft.fillScreen(TFT_BLACK); tft.setCursor(0, 0); tft.setTextColor(TFT_WHITE); tft.setTextSize(1);
+
+  if (!SD.exists("/Ardudows")) SD.mkdir("/Ardudows");
+  if (!SD.exists(isoPath) && !SD.exists(archBase + "/boot/vmlinuz-linux")) {
+    tft.println(F(">> Media layout missing. Automatically fetching installation framework..."));
+    File isoAlloc = SD.open(isoPath, FILE_WRITE);
+    if (isoAlloc) {
+      isoAlloc.println("ARCH_LINUX_CORE_VOL_INFO_ISO_N16R8_STUB");
+      isoAlloc.close();
+      tft.println(F(">> Allocated /Ardudows/Arch_Linux.iso successfully (4.0 GiB Target Dynamic allocation)."));
+      delay(800);
+    } else {
+      arch_kernel_panic("Storage Medium Inaccessible. SD Write Protect enabled?", "0xERR_HARDWARE_IO");
+      return;
+    }
+  }
+
+  // 동적 상태 복구 엔진 
+  bool step1_ok  = SD.exists(archBase + "/.install_step_1");  // timedatectl
+  bool step2_ok  = SD.exists(archBase + "/.install_step_2");  // fdisk
+  bool step3_ok  = SD.exists(archBase + "/.install_step_3");  // mkfs
+  bool step4_ok  = SD.exists(archBase + "/.install_step_4");  // mount
+  bool step5_ok  = SD.exists(archBase + "/.install_step_5");  // pacstrap
+  bool step6_ok  = SD.exists(archBase + "/.install_step_6");  // genfstab
+  bool step7_ok  = SD.exists(archBase + "/.install_step_7");  // chroot
+  bool step8_ok  = SD.exists(archBase + "/.install_step_8");  // timezone
+  bool step9_ok  = SD.exists(archBase + "/.install_step_9");  // locale
+  bool step10_ok = SD.exists(archBase + "/.install_step_10"); // passwd
+  bool step11_ok = SD.exists(archBase + "/.install_step_11"); // grub
+  bool step12_ok = SD.exists(archBase + "/.install_step_12"); // systemctl
+
+  if (step1_ok)  archKernel.timedateSynced = true;
+  if (step2_ok)  archKernel.allocatedSizeMB = 4096;
+  if (step11_ok) archKernel.grubInstalled = true;
+  
+  if (SD.exists(archBase + "/etc/shadow")) {
+    File sf = SD.open(archBase + "/etc/shadow", FILE_READ);
+    if (sf) {
+      String content = sf.readString(); sf.close();
+      int sIdx = content.indexOf("$mocksalt$");
+      if (sIdx != -1) archKernel.rootPassword = content.substring(sIdx + 10).readStringUntil('\n');
+      if (archKernel.rootPassword.endsWith("\n")) archKernel.rootPassword.trim();
+    }
+  }
+  if (SD.exists(archBase + "/etc/systemd/system/multi-user.target.wants/NetworkManager.service")) {
+    archKernel.networkManagerEnabled = true;
+  }
+
+  register_process(1, "systemd", "S", 4096);
+  register_process(2, "kthreadd", "S", 0);
+  register_process(10, "rcu_gp", "S", 0);
+  register_process(50, "ksoftirqd/0", "S", 0);
+  register_process(503, "bash", "R", 2048);
+
+  archKernel.mountTable[0] = {"/dev/loop0", "/", "squashfs", true}; 
+  archKernel.mountCount = 1;
+
+  // 성공적인 부팅 진입점 조건 (오직 하나의 엄격한 성공 경로 검증)
+  if (SD.exists(archBase + "/boot/vmlinuz-linux") && step1_ok && step2_ok && step3_ok && step4_ok && step5_ok && step6_ok && step8_ok && step9_ok && step10_ok && step11_ok && step12_ok) {
+    archKernel.isInstalled = true;
+    archKernel.mountTable[0] = {"/dev/sda2", "/", "ext4", true}; 
+    
+    printSystemBootLogs();
+    
+    tft.setTextColor(TFT_GREEN); tft.println(F("[  OK  ] Reached target Multi-User System Environment Sublayer.")); tft.setTextColor(TFT_WHITE);
+    if (archKernel.networkManagerEnabled) {
+      tft.println(F("[  OK  ] Started Network Manager daemon instance link."));
+      register_process(210, "NetworkManager", "S", 12288);
+    }
+    tft.println(F("\nArch Linux 6.13.4-arch1-esp32 (tty1)\n"));
+
+    while (true) {
+      tft.print(F("arch-esp32 login: "));
+      String user = CustomKeyboard_ReadLine(); user.trim();
+      tft.print(F("Password: "));
+      String pass = CustomKeyboard_ReadHiddenLine(); pass.trim();
+
+      if (user == "root" && (pass == archKernel.rootPassword || archKernel.rootPassword == "")) {
+        tft.fillScreen(TFT_BLACK); tft.setCursor(0, 0); tft.setTextColor(TFT_CYAN);
+        tft.printf("Last login: Fri Jun 12 21:05:44 on tty1\n");
+        tft.printf("OS-Core: Linux arch-esp32 6.13.4 (Hardware Target: %s)\n", ESP.getChipModel());
+        tft.setTextColor(TFT_WHITE); tft.println();
+        memset(archKernel.currentDir, 0, PATH_BUFFER_SIZE);
+        strcpy(archKernel.currentDir, "/root");
+        break;
+      } else {
+        tft.setTextColor(TFT_RED); tft.println(F("Login incorrect. Connection verification sequence mapping failed.")); tft.setTextColor(TFT_WHITE);
+      }
+    }
+  } else {
+    // 라이브 ISO 환경 부팅
+    tft.println(F(":: running early hook [udev]")); delay(100);
+    tft.println(F(":: running hook [udev]")); delay(100);
+    tft.println(F(":: Triggering uevents...")); delay(150);
+    tft.println(F(":: running hook [memdisk]")); delay(100);
+    tft.println(F("[  OK  ] Loaded Volatile Temporary Environment."));
+    tft.println(F(":: running hook [archiso]")); delay(200);
+    tft.println(F(":: Starting version 255.5-1-arch")); delay(100);
+    tft.println();
+    tft.setTextColor(TFT_GREEN); tft.println(F("Welcome to Arch Linux Live Installation Environment!")); tft.setTextColor(TFT_WHITE);
+    tft.println(F("Type 'fdisk /dev/sda' to manage partitions, follow standard installation chain rules."));
+    tft.println();
+
+    writeRawData(liveISO + "/sys/firmware/efi/fw_platform_size", "64\n");
+    writeRawData(liveISO + "/etc/issue", "Arch Linux install medium (x86_64)\n");
+    
+    const char* base_dirs[] = {
+      "/bin", "/boot", "/dev", "/etc", "/home", "/lib", "/media", "/mnt", 
+      "/opt", "/proc", "/root", "/run", "/sbin", "/srv", "/sys", "/tmp", "/usr", "/var"
+    };
+    for (const char* dir : base_dirs) { SD.mkdir(liveISO + String(dir)); }
+    memset(archKernel.currentDir, 0, PATH_BUFFER_SIZE);
+    strcpy(archKernel.currentDir, "/");
+  }
+
+  bool needPrompt = true;
+
+  while (true) {
+    yield();
+
+    if (needPrompt) {
+      if (archKernel.isInstalled && !archKernel.isChrooted) {
+        tft.setTextColor(TFT_GREEN); tft.print(F("[root@arch-esp32 "));
+        tft.setTextColor(TFT_WHITE); tft.print(archKernel.currentDir);
+        tft.setTextColor(TFT_GREEN); tft.print(F("]# "));
+      } else if (archKernel.isChrooted) {
+        tft.setTextColor(TFT_RED); tft.print(F("[root@archiso "));
+        tft.setTextColor(TFT_WHITE); tft.print(archKernel.currentDir);
+        tft.setTextColor(TFT_RED); tft.print(F("]# "));
+      } else {
+        tft.setTextColor(TFT_RED); tft.print(F("root"));
+        tft.setTextColor(TFT_WHITE); tft.print(F("@"));
+        tft.setTextColor(TFT_CYAN); tft.print(F("archiso"));
+        tft.setTextColor(TFT_WHITE); tft.print(F(" "));
+        tft.setTextColor(TFT_BLUE); tft.print(archKernel.currentDir);
+        tft.setTextColor(TFT_WHITE); tft.print(F(" # "));
+      }
+      tft.setTextColor(TFT_WHITE);
+      needPrompt = false; 
+    }
+
+    char key = Keyboard_GetKey();
+    if (key == 0) continue; 
+
+    if (key == 13) { 
+      tft.println(); archCommand.trim();
+
+      if (archCommand.length() > 0) {
+        writeRawData(getRealPath("/root/.bash_history", archBase, liveISO), archCommand + "\n", true);
+
+        String argv[6] = {"", "", "", "", "", ""};
+        int argc = 0; String tmp = archCommand;
+        while (tmp.length() > 0 && argc < 6) {
+          if (tmp.charAt(0) == '"') {
+            int qEnd = tmp.indexOf('"', 1);
+            if (qEnd != -1) { argv[argc++] = tmp.substring(1, qEnd); tmp = tmp.substring(qEnd + 1); }
+          } else {
+            int sIdx = tmp.indexOf(' ');
+            if (sIdx == -1) { argv[argc++] = tmp; break; }
+            else { argv[argc++] = tmp.substring(0, sIdx); tmp = tmp.substring(sIdx + 1); }
+          }
+          tmp.trim();
+        }
+
+        // ============================================================
+        // 🛠️ [기본 명령어 구현부]
+        // ============================================================
+        if (argv[0] == "clear") { tft.fillScreen(TFT_BLACK); tft.setCursor(0, 0); }
+        else if (argv[0] == "pwd") { tft.println(archKernel.currentDir); }
+        else if (argv[0] == "uname") {
+          if (argv[1] == "-a") tft.printf("Linux arch-esp32 6.13.4-arch1-esp32 SMP PREEMPT %s xtensa LX7 GNU/Linux\n", __DATE__);
+          else tft.println("Linux");
+        }
+        else if (argv[0] == "whoami") { tft.println(F("root")); }
+        else if (argv[0] == "hostname") { tft.println(F("arch-esp32")); }
+        else if (argv[0] == "dmesg") { printSystemBootLogs(); }
+        
+        else if (argv[0] == "cat" && argv[1].startsWith("/proc/")) {
+          String procTarget = argv[1].substring(6);
+          if (procTarget == "cpuinfo") {
+            tft.printf("processor       : 0\nmodel name      : Tensilica Xtensa LX7 Dual-Core\ncpu MHz         : 240.00\nbogomips        : 480.00\n\nprocessor       : 1\nmodel name      : Tensilica Xtensa LX7 Dual-Core\n\nHardware        : ESP32-S3 VFS Integration Sublayer\n");
+          }
+          else if (procTarget == "meminfo") {
+            uint32_t realFreeRam = ESP.getFreeHeap();
+            uint32_t realTotalRam = ESP.getHeapSize();
+            tft.printf("MemTotal:       %8lu kB\nMemFree:        %8lu kB\nMemAvailable:   %8lu kB\n", realTotalRam / 1024, realFreeRam / 1024, realFreeRam / 1024);
+          }
+          else if (procTarget == "version") { tft.println(F("Linux version 6.13.4-arch1-esp32 (gcc version 14.1.0)")); }
+          else if (procTarget == "uptime") { tft.printf("%lu.00 %lu.00\n", millis() / 1000, millis() / 1000); }
+          else { tft.printf("cat: /proc/%s: No such file or directory\n", procTarget.c_str()); }
+        }
+
+        else if (argv[0] == "cat") {
+          if (argv[1] != "") {
+            String rPath = getRealPath(argv[1], archBase, liveISO);
+            if (SD.exists(rPath)) {
+              File f = SD.open(rPath, FILE_READ);
+              if (f.isDirectory()) { tft.printf("cat: %s: Is a directory\n", argv[1].c_str()); }
+              else {
+                while(f.available()) {
+                  char chunk[64];
+                  int bytesRead = f.readBytes(chunk, sizeof(chunk) - 1);
+                  chunk[bytesRead] = '\0';
+                  tft.print(chunk);
+                  yield();
+                }
+                tft.println();
+              }
+              f.close();
+            } else { tft.printf("cat: %s: No such file or directory\n", argv[1].c_str()); }
+          }
+        }
+
+        else if (argv[0] == "echo") {
+          if (argv[2] == ">" || argv[2] == ">>") {
+            writeRawData(getRealPath(argv[3], archBase, liveISO), argv[1] + "\n", argv[2] == ">>");
+          } else { tft.println(argv[1]); }
+        }
+        else if (argv[0] == "mkdir") {
+          if (argv[1] != "") SD.mkdir(getRealPath(argv[1], archBase, liveISO));
+        }
+        else if (argv[0] == "rm") {
+          if (argv[1] != "") {
+            String targetPath = getRealPath(argv[1] == "-rf" ? argv[2] : argv[1], archBase, liveISO);
+            if (SD.exists(targetPath)) SD.remove(targetPath);
+          }
+        }
+
+        else if (argv[0] == "ls") {
+          bool isLong = (argv[1] == "-l" || argv[1] == "-al" || argv[1] == "-la");
+          String target = (argv[1].startsWith("-") ? (argv[2] != "" ? argv[2] : ".") : (argv[1] != "" ? argv[1] : "."));
+          if (target == ".") target = archKernel.currentDir;
+
+          String rPath = getRealPath(target, archBase, liveISO);
+          File dir = SD.open(rPath);
+          if (dir && dir.isDirectory()) {
+            while (true) {
+              File entry = dir.openNextFile();
+              if (!entry) break;
+              String n = entry.name();
+              bool isDir = entry.isDirectory();
+              bool isExec = (!isDir && (n == "bash" || n == "ls" || n == "pacman" || n == "systemctl" || n == "htop" || n == "grub-install"));
+
+              if (isLong) {
+                if (isDir) tft.print("drwxr-xr-x   root root ");
+                else if (isExec) tft.print("-rwxr-xr-x   root root ");
+                else tft.print("-rw-r--r--   root root ");
+                tft.printf("%8lu Jun 12 21:10 ", entry.size());
+              }
+
+              if (isDir) { tft.setTextColor(TFT_BLUE); tft.print("dr "); }
+              else if (isExec) { tft.setTextColor(TFT_GREEN); tft.print("ex "); }
+              else { tft.setTextColor(TFT_WHITE); tft.print("fi "); }
+              
+              tft.print(n);
+              if (isLong) tft.println(); else tft.print("  ");
+              tft.setTextColor(TFT_WHITE);
+              entry.close();
+            }
+            dir.close(); if (!isLong) tft.println();
+          } else { tft.printf("ls: cannot access '%s': No such file or directory\n", target.c_str()); }
+        }
+
+        else if (argv[0] == "cd") {
+          String target = argv[1];
+          if (target == "" || target == "~") target = (archKernel.isInstalled) ? "/root" : "/";
+          if (target == "..") {
+            String curStr = String(archKernel.currentDir);
+            if (curStr != "/") {
+              int ls = curStr.lastIndexOf('/');
+              String sub = (ls <= 0) ? "/" : curStr.substring(0, ls);
+              strcpy(archKernel.currentDir, sub.c_str());
+            }
+          } else {
+            String curStr = String(archKernel.currentDir);
+            String testVirtual = target.startsWith("/") ? target : (curStr == "/" ? "/" + target : curStr + "/" + target);
+            testVirtual.replace("//", "/");
+            if (SD.exists(getRealPath(testVirtual, archBase, liveISO))) {
+              strcpy(archKernel.currentDir, testVirtual.c_str());
+            } else { tft.printf("-bash: cd: %s: No such file or directory\n", target.c_str()); }
+          }
+        }
+
+        else if (argv[0] == "ps") {
+          tft.println(F("PID USER       VSZ STAT COMMAND"));
+          for (int i = 0; i < archKernel.taskCount; i++) {
+            tft.printf("%3d root     %5lu %s    %s\n", archKernel.tasks[i].pid, archKernel.tasks[i].vsize, archKernel.tasks[i].state, archKernel.tasks[i].name);
+          }
+        }
+        else if (argv[0] == "htop") { launchHtopMonitor(); }
+        else if (argv[0] == "free") {
+          uint32_t totalRAM = ESP.getHeapSize();
+          uint32_t freeRAM = ESP.getFreeHeap();
+          tft.println(F("               total        used        free      shared  buff/cache   available"));
+          tft.printf("Mem:       %9lu   %9lu   %9lu           0           0   %9lu\n", totalRAM/1024, (totalRAM-freeRAM)/1024, freeRAM/1024, freeRAM/1024);
+        }
+        else if (argv[0] == "df") {
+          unsigned long totalSizeUsed = getDirectorySize(archBase);
+          float usedPercentage = ((float)totalSizeUsed / (4.0f * 1024.0f * 1024.0f * 1024.0f)) * 100.0f;
+          unsigned long freeSpace = (4 * 1024) - (totalSizeUsed / 1024 / 1024);
+          tft.println(F("Filesystem      Size  Used Avail Use% Mounted on"));
+          tft.printf("/dev/sda2       4.0G  %3luM  %1.1fG   %d%% /\n", totalSizeUsed/1024/1024, (float)freeSpace/1024.0f, (int)usedPercentage);
+        }
+        else if (argv[0] == "ip" && argv[1] == "a") {
+          tft.println(F("1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 state UNKNOWN\n    inet 127.0.0.1/8 scope host lo"));
+          tft.printf("2: wlan0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 state UP\n    inet 192.168.43.54/24 scope global wlan0\n");
+        }
+        
+        // ============================================================
+        // ⚙️ [초빡빡한 INTERACTIVE ARCH INSTALLATION CHAIN 12단계 검증 루프]
+        // ============================================================
+        
+        // [단계 1] timedatectl (네트워크 동기화 설정 검증)
+        else if (argv[0] == "timedatectl" && argv[1] == "set-ntp" && argv[2] == "true") {
+          tft.println(F("Communication with NTP server initialization sequence executed..."));
+          delay(400);
+          archKernel.timedateSynced = true;
+          kernel_write_file(archBase + "/.install_step_1", "OK", false);
+          tft.println(F("Local system clock synchronized with network time matrix repository."));
+        }
+
+        // [단계 2] fdisk /dev/sda (파티션 할당)
+        else if (argv[0] == "fdisk" && argv[1] == "/dev/sda") {
+          if (!SD.exists(archBase + "/.install_step_1")) {
+            tft.println(F("fdisk: fatal: hardware platform clock layer unstable. Sync timedatectl first."));
+          } else {
+            tft.println(F("Welcome to fdisk (util-linux 2.40.1)."));
+            int fdiskState = 0;
+            while(true) {
+              tft.print(F("Command (m for help): "));
+              String fcmd = CustomKeyboard_ReadLine(); fcmd.trim();
+              if (fcmd == "m") {
+                tft.println(F("  n   add a new partition\n  p   print partition mapping\n  w   write table to storage and exit"));
+              } else if (fcmd == "n") {
+                tft.println(F("Partition type: p (Primary)"));
+                fdiskState = 1;
+              } else if (fcmd == "p" && fdiskState == 1) {
+                tft.println(F("Partition number (1-4, default 1): 2\nFirst sector: +4G\nCreated partition 2 (Linux Ext4)"));
+                fdiskState = 2;
+              } else if (fcmd == "w") {
+                if (fdiskState == 2) {
+                  tft.println(F("The partition table has been altered. Syncing disks."));
+                  DiskPartition sda2 = {0x00, {0,0,0}, 0x83, {0,0,0}, 2048, 8388607};
+                  File f = SD.open(archBase + "/.mbr_table", FILE_WRITE);
+                  if (f) { f.write((uint8_t*)&sda2, sizeof(sda2)); f.close(); }
+                  archKernel.allocatedSizeMB = 4096;
+                  kernel_write_file(archBase + "/.install_step_2", "OK", false);
+                  break;
+                } else { tft.println(F("Table mapping aborted.")); break; }
+              }
+            }
+          }
+        }
+
+        // [단계 3] mkfs.ext4 /dev/sda2
+        else if (argv[0] == "mkfs.ext4" && argv[1] == "/dev/sda2") {
+          if (!SD.exists(archBase + "/.install_step_2")) {
+            tft.println(F("mkfs.ext4: /dev/sda2: Block layout description layer missing. Run fdisk first."));
+          } else {
+            tft.print(F("Discarding blocks: done\nCreating ext4 mapping layout database node: "));
+            delay(300); tft.println(F("done"));
+            uint16_t ext4Magic = 0xEF53;
+            File f = SD.open(archBase + "/.ext4_superblock", FILE_WRITE);
+            if (f) { f.write((uint8_t*)&ext4Magic, 2); f.close(); }
+            kernel_write_file(archBase + "/.install_step_3", "OK", false);
+          }
+        }
+
+        // [단계 4] mount /dev/sda2 /mnt
+        else if (argv[0] == "mount" && argv[1] == "/dev/sda2" && argv[2] == "/mnt") {
+          if (!SD.exists(archBase + "/.install_step_3")) {
+            tft.println(F("mount: /mnt: failure to parse superblock geometry on /dev/sda2 node."));
+          } else {
+            archKernel.mountTable[archKernel.mountCount++] = {"/dev/sda2", "/mnt", "ext4", true};
+            kernel_write_file(archBase + "/.install_step_4", "OK", false);
+            tft.println(F("mount: /dev/sda2 successfully interlocked onto storage path /mnt context."));
+          }
+        }
+
+        // [단계 5] pacstrap /mnt base linux linux-firmware (벌크 데이터 폭격)
+        else if (argv[0] == "pacstrap" && argv[1] == "/mnt" && argv[2] == "base" && argv[3] == "linux" && argv[4] == "linux-firmware") {
+          if (!SD.exists(archBase + "/.install_step_4")) {
+            tft.println(F("==> ERROR: Mount point registry isolation broken. Falsified target path."));
+          } else {
+            tft.println(F("==> Initializing pacstrap runtime environment at /mnt...\n==> Pulling target configuration headers..."));
+            for (int p = 0; p <= 100; p += 10) {
+              tft.printf("\rDownloading baseline object architectures: [%-10s] %d%%", String(p >= 30 ? "###" : "#") + (p >= 60 ? "###" : "") + (p >= 90 ? "###" : ""), p);
+              delay(80);
+            }
+            tft.println();
+            deployMassiveSystemFiles(archBase); 
+            kernel_write_file(archBase + "/boot/vmlinuz-linux", "ESP32_MASSIVE_ARCH_KERNEL_BIN");
+            kernel_write_file(archBase + "/.install_step_5", "OK", false);
+            tft.println(F("==> pacstrap core installation sublayer deployment successful."));
+          }
+        }
+
+        // [단계 6] genfstab -U /mnt
+        else if (argv[0] == "genfstab" && argv[1] == "-U" && argv[2] == "/mnt") {
+          if (!SD.exists(archBase + "/.install_step_5")) {
+            tft.println(F("genfstab: fault: live allocation layout does not reference a valid root layout."));
+          } else {
+            String fstabContent = "# /dev/sda2 Core Ext4 Vol mapping\nUUID=64375a1c-9ef1-4bc3-a0e2-esp32s3n16r8   /   ext4   rw,relatime,errors=remount-ro   0   1\n";
+            if (argv[3] == ">>" && argv[4] != "") {
+              writeRawData(getRealPath(argv[4], archBase, liveISO), fstabContent, true);
+              tft.println(F("fstab registry parameters validated and flushed directly onto target descriptor block."));
+              kernel_write_file(archBase + "/.install_step_6", "OK", false);
+            } else { tft.print(fstabContent); }
+          }
+        }
+
+        // [단계 7] arch-chroot /mnt
+        else if (argv[0] == "arch-chroot" && argv[1] == "/mnt") {
+          if (!SD.exists(archBase + "/.install_step_6")) {
+            tft.println(F("chroot: target verification fault. Ensure fstab parameters are persistent."));
+          } else {
+            archKernel.isChrooted = true;
+            memset(archKernel.currentDir, 0, PATH_BUFFER_SIZE);
+            strcpy(archKernel.currentDir, "/");
+            kernel_write_file(archBase + "/.install_step_7", "OK", false);
+            tft.println(F("chroot: Execution thread container completely moved to target jail isolation environment."));
+          }
+        }
+
+        // [단계 8] ln -sf /usr/share/zoneinfo/Asia/Seoul /etc/localtime
+        else if (argv[0] == "ln" && argv[1] == "-sf" && argv[2].indexOf("Asia/Seoul") != -1) {
+          if (!archKernel.isChrooted) {
+            tft.println(F("ln: permission denied or context target configuration is unreachable outside jail."));
+          } else {
+            kernel_write_file(archBase + "/etc/localtime", "KST-9\n");
+            kernel_write_file(archBase + "/.install_step_8", "OK", false);
+            tft.println(F("Symlink binding generated successfully for zone target [Asia/Seoul]."));
+          }
+        }
+
+        // [단계 9] locale-gen
+        else if (argv[0] == "locale-gen") {
+          if (!SD.exists(archBase + "/.install_step_8")) {
+            tft.println(F("locale-gen: prerequisite step failure: timezone linkage confirmation missing."));
+          } else {
+            tft.println(F("Generating system character translation arrays..."));
+            delay(300);
+            File f = SD.open(archBase + "/etc/locale.gen", FILE_READ);
+            bool localeUnlocked = false;
+            if (f) {
+              while (f.available()) {
+                String line = f.readStringUntil('\n'); line.trim();
+                if (!line.startsWith("#") && (line.indexOf("en_US.UTF-8") != -1 || line.indexOf("ko_KR.UTF-8") != -1)) {
+                  localeUnlocked = true; break;
+                }
+              }
+              f.close();
+            }
+            if (localeUnlocked) {
+              tft.println(F("  en_US.UTF-8... done\n  ko_KR.UTF-8... done\nGeneration complete."));
+              writeRawData(archBase + "/etc/locale.conf", "LANG=ko_KR.UTF-8\n", false);
+              kernel_write_file(archBase + "/.install_step_9", "OK", false);
+            } else {
+              tft.setTextColor(TFT_RED); tft.println(F("Error: Missing active, uncommented configurations inside /etc/locale.gen!")); tft.setTextColor(TFT_WHITE);
+            }
+          }
+        }
+
+        // [단계 10] passwd
+        else if (argv[0] == "passwd") {
+          if (!SD.exists(archBase + "/.install_step_9")) {
+            tft.println(F("passwd: block mapping access denied. Finish your locale configuration step first."));
+          } else {
+            tft.print(F("New password: ")); String p1 = CustomKeyboard_ReadHiddenLine(); p1.trim();
+            tft.print(F("Retype new password: ")); String p2 = CustomKeyboard_ReadHiddenLine(); p2.trim();
+            if (p1 == p2 && p1 != "") {
+              writeRawData(getRealPath("/etc/shadow", archBase, liveISO), "root:$6$mocksalt$" + p1 + ":19855:0:99999:7:::", false);
+              archKernel.rootPassword = p1;
+              kernel_write_file(archBase + "/.install_step_10", "OK", false);
+              tft.println(F("passwd: shadow credential storage sequence locked down securely."));
+            } else { tft.println(F("passwd: verification array divergence. Match parameters failed.")); }
+          }
+        }
+
+        // [단계 11] grub-install 및 grub-mkconfig (부트로더 장착 필수)
+        else if (argv[0] == "grub-install" && argv[1].startsWith("--target=")) {
+          if (!SD.exists(archBase + "/.install_step_10")) {
+            tft.println(F("grub-install: fatal: secure authentication layer unresolved. Execute passwd command."));
+          } else {
+            tft.println(F("Installing for x86_64-efi platform layout target..."));
+            delay(400);
+            kernel_write_file(archBase + "/boot/grub/efi_stub.bin", "GRUB_EFI");
+            tft.println(F("Installation finished. No error reported."));
+          }
+        }
+        else if (argv[0] == "grub-mkconfig" && argv[2].indexOf("grub.cfg") != -1) {
+          if (!SD.exists(archBase + "/boot/grub/efi_stub.bin")) {
+            tft.println(F("grub-mkconfig: target node empty. Run grub-install first."));
+          } else {
+            tft.println(F("Generating grub configuration file..."));
+            delay(200);
+            kernel_write_file(archBase + "/boot/grub/grub.cfg", "linux /boot/vmlinuz-linux root=UUID=64375a1c-9ef1-4bc3-a0e2-esp32s3n16r8 rw\n");
+            archKernel.grubInstalled = true;
+            kernel_write_file(archBase + "/.install_step_11", "OK", false);
+            tft.println(F("Found linux image: /boot/vmlinuz-linux\ndone"));
+          }
+        }
+
+        // [단계 12] systemctl enable NetworkManager (최종 서비스 결합 가드)
+        else if (argv[0] == "systemctl" && argv[1] == "enable" && argv[2] == "NetworkManager") {
+          if (!SD.exists(archBase + "/.install_step_11")) {
+            tft.println(F("systemctl: dependency fault: bootloader binary block mapping missing."));
+          } else {
+            kernel_write_file(archBase + "/.install_step_12", "OK", false);
+            kernel_write_file(archBase + "/etc/systemd/system/multi-user.target.wants/NetworkManager.service", "STUB_DAEMON");
+            archKernel.networkManagerEnabled = true;
+            tft.println(F("Created symlink binding for NetworkManager daemon service architecture successfully."));
+          }
+        }
+
+        // 패키지 매니저 동적 가동
+        else if (argv[0] == "pacman" && argv[1] == "-S" && argv[2] != "") {
+          if (!archKernel.isInstalled && !archKernel.isChrooted) {
+            tft.println(F("error: pacman database locked in read-only framework within the Live ISO storage architecture."));
+          } else {
+            tft.println(F("resolving core package dependencies...\nchecking for package conflicts..."));
+            tft.printf("Packages (1) %s-1.4.2-rolling\nProceed with execution sequence? [Y/n] ", argv[2].c_str());
+            while(true) {
+              char k = Keyboard_GetKey();
+              if (k == 'y' || k == 'Y' || k == 13) { tft.println(); break; }
+              yield();
+            }
+            String packageDest = archBase + "/usr/bin/" + argv[2];
+            fetchPackageFromServer(argv[2], packageDest);
+          }
+        }
+        
+        else if (argv[0] == "neofetch") {
+          tft.setTextColor(TFT_CYAN);
+          tft.println(F("                   -`          root@arch-esp32"));
+          tft.println(F("                  .o+`         ---------------"));
+          tft.println(F("                 `ooo/         OS: Arch Linux ARM Custom Layer"));
+          tft.println(F("                `+oooo:        Kernel: 6.13.4-arch1-esp32"));
+          tft.println(F("               `+oooooo:       Uptime: 1 min, 12 secs"));
+          tft.println(F("               -+oooooo+:      Shell: bash 5.2.26"));
+          tft.println(F("             `/:-:++oooo+:     CPU: Tensilica Xtensa LX7 Dual @ 240MHz"));
+          tft.println(F("            `/++++/+++++++:    Memory: 512 KiB / 8192 KiB (SRAM Array)"));
+          tft.println(F("           `/++++++++++++++:   Disk: 4.0 GiB Target Storage Block"));
+          tft.setTextColor(TFT_WHITE);
+        }
+
+        else if (argv[0] == "nano") { launchNanoEditor(getRealPath(argv[1], archBase, liveISO)); }
+        else if (argv[0] == "exit") { break; }
+        
+        // 🔄 시스템 콜 소프트웨어 리부트 런타임 검사기 (실패 시 가차없는 패닉 폭격 타겟 구조)
+        else if (argv[0] == "reboot") {
+          tft.fillScreen(TFT_BLACK); tft.setCursor(0, 0); 
+          tft.println(F("reboot: Initiating hardware shutdown matrix...")); 
+          delay(800);
+          
+          bool secureChainVerified = true;
+          for (int i = 1; i <= 12; i++) {
+            if (!SD.exists(archBase + "/.install_step_" + String(i))) {
+              secureChainVerified = false;
+            }
+          }
+
+          if (secureChainVerified && SD.exists(archBase + "/boot/vmlinuz-linux") && archKernel.grubInstalled) {
+            archKernel.isChrooted = false;
+            // 리부트 시 다음 부팅 영속성을 확보하되, 고증을 위해 스텝 플래그 파일 제거 방식을 원한다면 정리
+            for (int i = 1; i <= 12; i++) {
+              // 필요 시 보존하거나 삭제 처리하여 엄격한 단일 진입 경로 통제
+            }
+            return; 
+          } else {
+            arch_kernel_panic("Kernel boot integrity structure violated. Missing allocation block configuration profile context link.", "0xINCOMPLETE_INSTALLATION_CHAIN_FAULT");
+            return;
+          }
+        }
+        else { tft.printf("-bash: %s: command not found\n", argv[0].c_str()); }
+      }
+      
+      needPrompt = true;
+      archCommand = "";
+    }
+    else if (key == 8 && archCommand.length() > 0) { 
+      archCommand.remove(archCommand.length() - 1);
+      int newX = tft.getCursorX() - 6; if (newX < 0) newX = 0;
+      tft.fillRect(newX, tft.getCursorY(), 6, tft.fontHeight(), TFT_BLACK); tft.setCursor(newX, tft.getCursorY());
+    }
+    else if (key >= 32 && key <= 126) { archCommand += key; tft.print(key); }
+  }
 }
 
 // ================== COMMAND PARSER ==================
@@ -15843,6 +17547,13 @@ void executeCommand(String cmd) {
   else if (cmd == "dos" || cmd == "msdos" || cmd == "ms-dos" || cmd == "ms dos" || cmd == "DOS") {
     tft.setTextColor(TFT_WHITE);
     MSdos();
+  }
+
+  else if (cmd == "arch linux" || cmd == "arch" || cmd == "linux" || cmd == "arch_linux" || cmd == "Arch Linux" || cmd == "Arch linux" || cmd == "arch Linux") {
+    if (!SD.exists("/Ardudows/Arch_Linux.iso")) {
+      CreateFile("/Ardudows/Arch_Linux.iso");
+    }
+    Arch_Linux();
   }
   
   // --- [ UNKNOWN ] ---
