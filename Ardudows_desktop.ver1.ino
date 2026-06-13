@@ -1898,6 +1898,12 @@ void ArduInstaller() {
     delay(100);
   }
   */
+  SD.mkdir("/Ardudows/System/ArduSys");
+  Loading();
+  SD.mkdir("/Ardudows/System/ArduSys/Ardudows_Systems");
+  Loading();
+  SD.mkdir("/Ardudows/System/ArduSys/Ardudows_Systems/command");
+  Loading();
   SD.mkdir("/Ardudows/System/Registry");
   Loading();
   SD.mkdir("/Ardudows/System/Driver");
@@ -1930,7 +1936,19 @@ void ArduInstaller() {
   Loading();
   SD.mkdir("/Ardudows/System/NetWork/HTTPS");
   Loading();
+  SD.mkdir("/Ardudows/System/NetWork/Setup");
+  Loading();
+  SD.mkdir("/Ardudows/System/NetWork/Setup/PW");
+  Loading();
+  SD.mkdir("/Ardudows/System/NetWork/Setup/ID");
+  Loading();
+  SD.mkdir("/Ardudows/System/NetWork/certif");
+  Loading();
+  SD.mkdir("/Ardudows/System/NetWork/certif/SSL");
+  Loading();
   SD.mkdir("/Ardudows/System/Boot");
+  Loading();
+  SD.mkdir("/Ardudows/System/Bin");
   Loading();
   SD.mkdir("/Ardudows/System/ImpoSystem");
   Loading();
@@ -1941,6 +1959,8 @@ void ArduInstaller() {
   SD.mkdir("/Ardudows/System/ImpoSystem/Ardudows");
   Loading();
   SD.mkdir("/Ardudows/System/ImpoSystem/ATK");
+  Loading();
+  SD.mkdir("/Ardudows/System/ImpoSystem/AFK");
   Loading();
   SD.mkdir("/Ardudows/System/ImpoSystem/Driver");
   Loading();
@@ -1965,6 +1985,30 @@ void ArduInstaller() {
   Loading();
   //임시명임 나중에 AUIC 거치면 그 이름으로 이거 바꿔야됨
   SD.mkdir(("/Ardudows/Users/" + UserName + "/UserDATA").c_str());
+  Loading();
+  SD.mkdir(("/Ardudows/Users/" + UserName + "/Home").c_str());    //오케이 사용자 개선!
+  Loading();
+  SD.mkdir(("/Ardudows/Users/" + UserName + "/Home/Docs").c_str());
+  Loading();
+  SD.mkdir(("/Ardudows/Users/" + UserName + "/Home/Bin").c_str());
+  Loading();
+  SD.mkdir(("/Ardudows/Users/" + UserName + "/Home/Files").c_str());
+  Loading();
+  SD.mkdir(("/Ardudows/Users/" + UserName + "/Home/Documents").c_str());
+  Loading();
+  SD.mkdir(("/Ardudows/Users/" + UserName + "/Home/Downloads").c_str());
+  Loading();
+  SD.mkdir(("/Ardudows/Users/" + UserName + "/Home/Addti_User").c_str());
+  Loading();
+  SD.mkdir(("/Ardudows/Users/" + UserName + "/Home/Network").c_str());
+  Loading();
+  SD.mkdir(("/Ardudows/Users/" + UserName + "/Home/Image").c_str());
+  Loading();
+  SD.mkdir(("/Ardudows/Users/" + UserName + "/Home/Security").c_str());   //계인정보 같은 비밀 정보
+  Loading();
+  SD.mkdir(("/Ardudows/Users/" + UserName + "/Home/Security/DATA").c_str());
+  Loading();
+  SD.mkdir(("/Ardudows/Users/" + UserName + "/Home/Security/Profile").c_str());
   Loading();
   SD.mkdir("/Ardudows/Programs");
   Loading();
@@ -4139,28 +4183,35 @@ void AUIC_Draw() {
 
 
     case AUIC_DONE:
-      Registry_Set("User", "Name", auicUsername.c_str());
-      Registry_Set("User", "Authority", auicAuthority.c_str());
+
+      // 사용자 정보
+      Registry_Set("User", "User0", auicUsername.c_str());
+      Registry_Set("User", "Pass0", auicPassword.c_str());
+      Registry_Set("User", "Authority0", auicAuthority.c_str());
+
+      // 시스템 정보
       Registry_Set("System", "Language", auicLang.c_str());
       Registry_Set("System", "Country", auicCountry.c_str());
 
+  // 기타 정보
+      Registry_Set("System", "ComputerName", auicComputerName.c_str());
+      Registry_Set("System", "Workgroup", auicWorkgroup.c_str());
+    
       Registry_Save();
-
+    
       tft.print("Done!");
-
+    
       if (!auicFinished) {
         AUIC_Finish();
         auicFinished = true;
       }
-
+    
       tft.setTextSize(2);
       tft.setCursor(40, 180);
       tft.print("Reboot please");
-
+    
       break;
-  }
-
-
+    }
 
   // =========================
   // Footer
@@ -12127,7 +12178,6 @@ void MSdos() {
   } // while 루프 끝
 }
 
-
 /**
  * ============================================================================
  * 🧠 [Ardudows OS - Arch Linux 에뮬레이터 초정밀 설치 매뉴얼]
@@ -12178,7 +12228,6 @@ void MSdos() {
  * ============================================================================
  */
 
-
 // ============================================================
 // 🧠 [아치 커널 및 파티션 데이터 구조체 고도화]
 // ============================================================
@@ -12227,7 +12276,7 @@ struct LinuxKernelGlobal {
 LinuxKernelGlobal archKernel;
 
 // ============================================================
-// 🚨 [KERNEL PANIC HANDLER] 오리지널 Xtensa 레지스터 덤프 및 하드웨어 패닉 고증
+// 🚨 [KERNEL PANIC HANDLER] Xtensa 레지스터 덤프
 // ============================================================
 void arch_kernel_panic(const char* reason, const char* errorCode) {
   tft.fillScreen(TFT_BLACK);
@@ -12272,7 +12321,7 @@ void arch_kernel_panic(const char* reason, const char* errorCode) {
 }
 
 // ============================================================
-// 🗂️ [VFS ROUTER & 디렉토리 초정밀 벌크 계측기]
+// 🗂️ [VFS ROUTER & 디렉토리 벌크 계측기]
 // ============================================================
 String getRealPath(String virtualPath, String archBase, String liveISO) {
   virtualPath.trim();
@@ -12382,7 +12431,7 @@ String CustomKeyboard_ReadHiddenLine() {
     if (k == 8) {
       if (input.length() > 0) {
         input.remove(input.length() - 1);
-        int16_t w = 6; 
+        int16_t w = 6; // 고정폭 가정
         int newX = tft.getCursorX() - w; if (newX < 0) newX = 0;
         tft.fillRect(newX, tft.getCursorY(), w, tft.fontHeight(), TFT_BLACK);
         tft.setCursor(newX, tft.getCursorY());
@@ -12396,7 +12445,7 @@ String CustomKeyboard_ReadHiddenLine() {
 }
 
 // ============================================================
-// 💣 [MASSIVE FILE DISPATCHER] 18대 정통 루트 폴더 및 절차적 생성 폭격기 (수천개 벌크 생성 아키텍처)
+// 💣 [MASSIVE FILE DISPATCHER] 패키지 벌크 생성기
 // ============================================================
 void deployMassiveSystemFiles(String archBase) {
   tft.println(F(":: Preparing local package database..."));
@@ -12431,7 +12480,6 @@ void deployMassiveSystemFiles(String archBase) {
     totalCreated++;
   }
   
-  // 초하이퍼 리얼리티: 루프로 가짜 include 헤더 및 오브젝트 소스 대량 폭격 (수천개 스케일 연출)
   for (int i = 0; i < 400; i++) {
     kernel_write_file(archBase + "/usr/include/sys/types_" + String(i) + ".h", "/* Linux System Node Def */\ntypedef int sys_node_" + String(i) + "_t;\n");
     kernel_write_file(archBase + "/usr/share/man/man1/core_" + String(i) + ".1.gz", "MAN_PAGE_BINARY_COMPRESSED_DATA_STUB");
@@ -12456,7 +12504,6 @@ void deployMassiveSystemFiles(String archBase) {
     totalCreated++;
   }
 
-  // pacman 로컬 데이터베이스 롤링 초정밀 벌크 이식
   for (int i = 0; i < 250; i++) {
     String pkgName = "linux-firmware-node-core-" + String(i) + "-1.0-rolling";
     String pkgDir = archBase + "/var/lib/pacman/local/" + pkgName;
@@ -12480,7 +12527,7 @@ void deployMassiveSystemFiles(String archBase) {
 }
 
 // ============================================================
-// 📝 [NANO EDITOR] GNU nano 7.2 정밀 에뮬레이터
+// 📝 [NANO EDITOR]
 // ============================================================
 void launchNanoEditor(String realFilePath) {
   tft.fillScreen(TFT_BLACK); tft.setCursor(0, 0);
@@ -12501,7 +12548,7 @@ void launchNanoEditor(String realFilePath) {
     char k = Keyboard_GetKey();
     if (k == 0) continue;
 
-    if (k == 27) { // KEY_ESC 대용 -> 저장 및 종료
+    if (k == 27) { // ESC로 저장 및 종료
       tft.fillScreen(TFT_BLACK); tft.setCursor(0, 0);
       tft.println(F("Syncing files with physical sectors (fsync)...")); delay(300);
       kernel_write_file(realFilePath, fileContent, false);
@@ -12521,7 +12568,7 @@ void launchNanoEditor(String realFilePath) {
 }
 
 // ============================================================
-// 🔬 [REALTIME HTOP ENGINE] 실시간 하드웨어 연동 타겟 모니터
+// 🔬 [REALTIME HTOP ENGINE]
 // ============================================================
 void launchHtopMonitor() {
   tft.fillScreen(TFT_BLACK);
@@ -12592,7 +12639,9 @@ void launchHtopMonitor() {
   }
 }
 
-// 🌐 [REAL MIRROR NETWORKING] 실물 서버 연동 패키지 수혈 미러 엔진
+// ============================================================
+// 🌐 [REAL MIRROR NETWORKING] 
+// ============================================================
 bool fetchPackageFromServer(String packageName, String savePath) {
   if (WiFi.status() != WL_CONNECTED) {
     tft.setTextColor(TFT_RED);
@@ -12708,19 +12757,18 @@ void Arch_Linux() {
     }
   }
 
-  // 동적 상태 복구 엔진 
-  bool step1_ok  = SD.exists(archBase + "/.install_step_1");  // timedatectl
-  bool step2_ok  = SD.exists(archBase + "/.install_step_2");  // fdisk
-  bool step3_ok  = SD.exists(archBase + "/.install_step_3");  // mkfs
-  bool step4_ok  = SD.exists(archBase + "/.install_step_4");  // mount
-  bool step5_ok  = SD.exists(archBase + "/.install_step_5");  // pacstrap
-  bool step6_ok  = SD.exists(archBase + "/.install_step_6");  // genfstab
-  bool step7_ok  = SD.exists(archBase + "/.install_step_7");  // chroot
-  bool step8_ok  = SD.exists(archBase + "/.install_step_8");  // timezone
-  bool step9_ok  = SD.exists(archBase + "/.install_step_9");  // locale
-  bool step10_ok = SD.exists(archBase + "/.install_step_10"); // passwd
-  bool step11_ok = SD.exists(archBase + "/.install_step_11"); // grub
-  bool step12_ok = SD.exists(archBase + "/.install_step_12"); // systemctl
+  bool step1_ok  = SD.exists(archBase + "/.install_step_1");  
+  bool step2_ok  = SD.exists(archBase + "/.install_step_2");  
+  bool step3_ok  = SD.exists(archBase + "/.install_step_3");  
+  bool step4_ok  = SD.exists(archBase + "/.install_step_4");  
+  bool step5_ok  = SD.exists(archBase + "/.install_step_5");  
+  bool step6_ok  = SD.exists(archBase + "/.install_step_6");  
+  bool step7_ok  = SD.exists(archBase + "/.install_step_7");  
+  bool step8_ok  = SD.exists(archBase + "/.install_step_8");  
+  bool step9_ok  = SD.exists(archBase + "/.install_step_9");  
+  bool step10_ok = SD.exists(archBase + "/.install_step_10"); 
+  bool step11_ok = SD.exists(archBase + "/.install_step_11"); 
+  bool step12_ok = SD.exists(archBase + "/.install_step_12"); 
 
   if (step1_ok)  archKernel.timedateSynced = true;
   if (step2_ok)  archKernel.allocatedSizeMB = 4096;
@@ -12731,7 +12779,13 @@ void Arch_Linux() {
     if (sf) {
       String content = sf.readString(); sf.close();
       int sIdx = content.indexOf("$mocksalt$");
-      if (sIdx != -1) archKernel.rootPassword = content.substring(sIdx + 10).readStringUntil('\n');
+      String temp = content.substring(sIdx + 10);
+      int endIdx = temp.indexOf('\n');
+      if (endIdx != -1) {
+        archKernel.rootPassword = temp.substring(0, endIdx);
+      } else {
+        archKernel.rootPassword = temp; // 줄바꿈이 없는 경우 전체 문자열 저장
+      }
       if (archKernel.rootPassword.endsWith("\n")) archKernel.rootPassword.trim();
     }
   }
@@ -12748,7 +12802,6 @@ void Arch_Linux() {
   archKernel.mountTable[0] = {"/dev/loop0", "/", "squashfs", true}; 
   archKernel.mountCount = 1;
 
-  // 성공적인 부팅 진입점 조건 (오직 하나의 엄격한 성공 경로 검증)
   if (SD.exists(archBase + "/boot/vmlinuz-linux") && step1_ok && step2_ok && step3_ok && step4_ok && step5_ok && step6_ok && step8_ok && step9_ok && step10_ok && step11_ok && step12_ok) {
     archKernel.isInstalled = true;
     archKernel.mountTable[0] = {"/dev/sda2", "/", "ext4", true}; 
@@ -12781,7 +12834,6 @@ void Arch_Linux() {
       }
     }
   } else {
-    // 라이브 ISO 환경 부팅
     tft.println(F(":: running early hook [udev]")); delay(100);
     tft.println(F(":: running hook [udev]")); delay(100);
     tft.println(F(":: Triggering uevents...")); delay(150);
@@ -12855,9 +12907,6 @@ void Arch_Linux() {
           tmp.trim();
         }
 
-        // ============================================================
-        // 🛠️ [기본 명령어 구현부]
-        // ============================================================
         if (argv[0] == "clear") { tft.fillScreen(TFT_BLACK); tft.setCursor(0, 0); }
         else if (argv[0] == "pwd") { tft.println(archKernel.currentDir); }
         else if (argv[0] == "uname") {
@@ -12999,11 +13048,6 @@ void Arch_Linux() {
           tft.printf("2: wlan0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 state UP\n    inet 192.168.43.54/24 scope global wlan0\n");
         }
         
-        // ============================================================
-        // ⚙️ [초빡빡한 INTERACTIVE ARCH INSTALLATION CHAIN 12단계 검증 루프]
-        // ============================================================
-        
-        // [단계 1] timedatectl (네트워크 동기화 설정 검증)
         else if (argv[0] == "timedatectl" && argv[1] == "set-ntp" && argv[2] == "true") {
           tft.println(F("Communication with NTP server initialization sequence executed..."));
           delay(400);
@@ -13012,7 +13056,6 @@ void Arch_Linux() {
           tft.println(F("Local system clock synchronized with network time matrix repository."));
         }
 
-        // [단계 2] fdisk /dev/sda (파티션 할당)
         else if (argv[0] == "fdisk" && argv[1] == "/dev/sda") {
           if (!SD.exists(archBase + "/.install_step_1")) {
             tft.println(F("fdisk: fatal: hardware platform clock layer unstable. Sync timedatectl first."));
@@ -13045,7 +13088,6 @@ void Arch_Linux() {
           }
         }
 
-        // [단계 3] mkfs.ext4 /dev/sda2
         else if (argv[0] == "mkfs.ext4" && argv[1] == "/dev/sda2") {
           if (!SD.exists(archBase + "/.install_step_2")) {
             tft.println(F("mkfs.ext4: /dev/sda2: Block layout description layer missing. Run fdisk first."));
@@ -13059,7 +13101,6 @@ void Arch_Linux() {
           }
         }
 
-        // [단계 4] mount /dev/sda2 /mnt
         else if (argv[0] == "mount" && argv[1] == "/dev/sda2" && argv[2] == "/mnt") {
           if (!SD.exists(archBase + "/.install_step_3")) {
             tft.println(F("mount: /mnt: failure to parse superblock geometry on /dev/sda2 node."));
@@ -13070,7 +13111,6 @@ void Arch_Linux() {
           }
         }
 
-        // [단계 5] pacstrap /mnt base linux linux-firmware (벌크 데이터 폭격)
         else if (argv[0] == "pacstrap" && argv[1] == "/mnt" && argv[2] == "base" && argv[3] == "linux" && argv[4] == "linux-firmware") {
           if (!SD.exists(archBase + "/.install_step_4")) {
             tft.println(F("==> ERROR: Mount point registry isolation broken. Falsified target path."));
@@ -13088,7 +13128,6 @@ void Arch_Linux() {
           }
         }
 
-        // [단계 6] genfstab -U /mnt
         else if (argv[0] == "genfstab" && argv[1] == "-U" && argv[2] == "/mnt") {
           if (!SD.exists(archBase + "/.install_step_5")) {
             tft.println(F("genfstab: fault: live allocation layout does not reference a valid root layout."));
@@ -13102,7 +13141,6 @@ void Arch_Linux() {
           }
         }
 
-        // [단계 7] arch-chroot /mnt
         else if (argv[0] == "arch-chroot" && argv[1] == "/mnt") {
           if (!SD.exists(archBase + "/.install_step_6")) {
             tft.println(F("chroot: target verification fault. Ensure fstab parameters are persistent."));
@@ -13115,7 +13153,6 @@ void Arch_Linux() {
           }
         }
 
-        // [단계 8] ln -sf /usr/share/zoneinfo/Asia/Seoul /etc/localtime
         else if (argv[0] == "ln" && argv[1] == "-sf" && argv[2].indexOf("Asia/Seoul") != -1) {
           if (!archKernel.isChrooted) {
             tft.println(F("ln: permission denied or context target configuration is unreachable outside jail."));
@@ -13126,7 +13163,6 @@ void Arch_Linux() {
           }
         }
 
-        // [단계 9] locale-gen
         else if (argv[0] == "locale-gen") {
           if (!SD.exists(archBase + "/.install_step_8")) {
             tft.println(F("locale-gen: prerequisite step failure: timezone linkage confirmation missing."));
@@ -13154,7 +13190,6 @@ void Arch_Linux() {
           }
         }
 
-        // [단계 10] passwd
         else if (argv[0] == "passwd") {
           if (!SD.exists(archBase + "/.install_step_9")) {
             tft.println(F("passwd: block mapping access denied. Finish your locale configuration step first."));
@@ -13170,7 +13205,6 @@ void Arch_Linux() {
           }
         }
 
-        // [단계 11] grub-install 및 grub-mkconfig (부트로더 장착 필수)
         else if (argv[0] == "grub-install" && argv[1].startsWith("--target=")) {
           if (!SD.exists(archBase + "/.install_step_10")) {
             tft.println(F("grub-install: fatal: secure authentication layer unresolved. Execute passwd command."));
@@ -13194,7 +13228,6 @@ void Arch_Linux() {
           }
         }
 
-        // [단계 12] systemctl enable NetworkManager (최종 서비스 결합 가드)
         else if (argv[0] == "systemctl" && argv[1] == "enable" && argv[2] == "NetworkManager") {
           if (!SD.exists(archBase + "/.install_step_11")) {
             tft.println(F("systemctl: dependency fault: bootloader binary block mapping missing."));
@@ -13206,7 +13239,6 @@ void Arch_Linux() {
           }
         }
 
-        // 패키지 매니저 동적 가동
         else if (argv[0] == "pacman" && argv[1] == "-S" && argv[2] != "") {
           if (!archKernel.isInstalled && !archKernel.isChrooted) {
             tft.println(F("error: pacman database locked in read-only framework within the Live ISO storage architecture."));
@@ -13240,7 +13272,6 @@ void Arch_Linux() {
         else if (argv[0] == "nano") { launchNanoEditor(getRealPath(argv[1], archBase, liveISO)); }
         else if (argv[0] == "exit") { break; }
         
-        // 🔄 시스템 콜 소프트웨어 리부트 런타임 검사기 (실패 시 가차없는 패닉 폭격 타겟 구조)
         else if (argv[0] == "reboot") {
           tft.fillScreen(TFT_BLACK); tft.setCursor(0, 0); 
           tft.println(F("reboot: Initiating hardware shutdown matrix...")); 
@@ -13255,10 +13286,6 @@ void Arch_Linux() {
 
           if (secureChainVerified && SD.exists(archBase + "/boot/vmlinuz-linux") && archKernel.grubInstalled) {
             archKernel.isChrooted = false;
-            // 리부트 시 다음 부팅 영속성을 확보하되, 고증을 위해 스텝 플래그 파일 제거 방식을 원한다면 정리
-            for (int i = 1; i <= 12; i++) {
-              // 필요 시 보존하거나 삭제 처리하여 엄격한 단일 진입 경로 통제
-            }
             return; 
           } else {
             arch_kernel_panic("Kernel boot integrity structure violated. Missing allocation block configuration profile context link.", "0xINCOMPLETE_INSTALLATION_CHAIN_FAULT");
@@ -15994,7 +16021,8 @@ void executeCommand(String cmd) {
   }
 
   else if (cmd.startsWith("usertool ")) {
-    String parts[4]; // 수정: 배열 선언 필수
+
+    String parts[4];
     int partCount = 0;
     int startIdx = 0;
     int spaceIdx = cmd.indexOf(' ');
@@ -16006,65 +16034,183 @@ void executeCommand(String cmd) {
     }
     parts[partCount++] = cmd.substring(startIdx);
 
-    String action = parts[1]; // 수정: 배열 인덱스 명시
+    String action = parts[1];
     action.toLowerCase();
 
+    // ==================================================
+    // ADD
+    // ==================================================
     if (action == "add" && partCount >= 4) {
+
       String name = parts[2];
       String pass = parts[3];
-      String path = "/Ardudows/Users/" + name;
 
-      if (SD.exists(path)) {
-        tft.println("User already exists!");
-      } else {
-        SD.mkdir(path.c_str());
-        String sect = "USER_" + name;
-        Registry_Set(sect.c_str(), "ID", name.c_str());
-        Registry_Set(sect.c_str(), "PW", pass.c_str());
-        Registry_Save();
-        tft.printf("User [%s] added.\n", name.c_str());
-      }
-   }
-    else if (action == "copy" && partCount >= 3) {
-      String src = parts[2];
-      if (!SD.exists("/Ardudows/Users/" + src)) {
-        tft.println("Source not found.");
-      } else {
-        String dest;
-        int i = 1;
-        while(true) {
-          dest = src + "_cp" + String(i);
-          if (!SD.exists("/Ardudows/Users/" + dest)) break;
-          i++;
+      bool exists = false;
+
+      for (int i = 0; i < 100; i++) {
+
+        String user =
+          Registry_Read_Value(
+            "/Ardudows/System/Registry/User.asf",
+            ("User" + String(i)).c_str());
+
+        if (user == name) {
+          exists = true;
+          break;
         }
-        SD.mkdir(("/Ardudows/Users/" + dest).c_str());
-        String dstSect = "USER_" + dest;
-        Registry_Set(dstSect.c_str(), "ID", dest.c_str());
-        Registry_Set(dstSect.c_str(), "PW", Registry_Get(("USER_" + src).c_str(), "PW"));
+      }
+
+      if (exists) {
+
+        tft.println("User already exists!");
+
+      } else {
+
+        int index = 0;
+
+        while (true) {
+
+          String user =
+            Registry_Read_Value(
+              "/Ardudows/System/Registry/User.asf",
+              ("User" + String(index)).c_str());
+
+          if (user == "")
+            break;
+
+          index++;
+        }
+
+        Registry_Set(
+          "User",
+          ("User" + String(index)).c_str(),
+          name.c_str());
+
+        Registry_Set(
+          "User",
+          ("Pass" + String(index)).c_str(),
+          pass.c_str());
+
         Registry_Save();
-        tft.println("Cloned: " + dest);
+
+        SD.mkdir(("/Ardudows/Users/" + name).c_str());
+
+        tft.println("User added.");
       }
     }
+
+    // ==================================================
+    // CHPW
+    // ==================================================
     else if (action == "chpw" && partCount >= 4) {
+
       String name = parts[2];
       String newPw = parts[3];
-      String sect = "USER_" + name;
-      if (String(Registry_Get(sect.c_str(), "ID")) == "") {
+
+      int found = -1;
+
+      for (int i = 0; i < 100; i++) {
+
+        String user =
+          Registry_Read_Value(
+            "/Ardudows/System/Registry/User.asf",
+            ("User" + String(i)).c_str());
+
+        if (user == name) {
+          found = i;
+          break;
+        }
+      }
+
+      if (found == -1) {
+
         tft.println("User not found.");
+
       } else {
-        Registry_Set(sect.c_str(), "PW", newPw.c_str());
+
+        Registry_Set(
+          "User",
+          ("Pass" + String(found)).c_str(),
+          newPw.c_str());
+
         Registry_Save();
-        tft.println("PW updated.");
+
+        tft.println("Password updated.");
       }
     }
+
+    // ==================================================
+    // INFO
+    // ==================================================
     else if (action == "info" && partCount >= 3) {
+
       String name = parts[2];
-      String sect = "USER_" + name;
-      tft.println(">> USER: " + name);
-      tft.println(">> PASS: " + String(Registry_Get(sect.c_str(), "PW")));
+
+      int found = -1;
+
+      for (int i = 0; i < 100; i++) {
+
+        String user =
+          Registry_Read_Value(
+            "/Ardudows/System/Registry/User.asf",
+            ("User" + String(i)).c_str());
+
+        if (user == name) {
+          found = i;
+          break;
+        }
+      }
+
+      if (found == -1) {
+
+        tft.println("User not found.");
+
+      } else {
+
+        tft.println("User : " + name);
+        tft.println("Index: " + String(found));
+
+        String authority =
+          Registry_Read_Value(
+            "/Ardudows/System/Registry/User.asf",
+            ("Authority" + String(found)).c_str());
+
+        if (authority != "")
+          tft.println("Auth : " + authority);
+      }
     }
+
+    // ==================================================
+    // LIST
+    // ==================================================
+    else if (action == "list") {
+
+      tft.println("=== USERS ===");
+
+      for (int i = 0; i < 100; i++) {
+
+        String user =
+          Registry_Read_Value(
+            "/Ardudows/System/Registry/User.asf",
+            ("User" + String(i)).c_str());
+
+        if (user == "")
+          break;
+
+        tft.println(
+          String(i) + ": " + user);
+      }
+    }
+
+    // ==================================================
+    // HELP
+    // ==================================================
     else {
-      tft.println("Usage: usertool [add|copy|chpw|info]");
+
+      tft.println("usertool add <user> <pass>");
+      tft.println("usertool chpw <user> <pass>");
+      tft.println("usertool info <user>");
+      tft.println("usertool list");
     }
   }
 
@@ -17551,7 +17697,7 @@ void executeCommand(String cmd) {
 
   else if (cmd == "arch linux" || cmd == "arch" || cmd == "linux" || cmd == "arch_linux" || cmd == "Arch Linux" || cmd == "Arch linux" || cmd == "arch Linux") {
     if (!SD.exists("/Ardudows/Arch_Linux.iso")) {
-      CreateFile("/Ardudows/Arch_Linux.iso");
+      CreateFile("/Ardudows/Arch_Linux.iso", "");
     }
     Arch_Linux();
   }
@@ -18023,79 +18169,160 @@ void Ardudows_StateMachine() {
     // ==================================================
     case BOOT_LOGIN:
       {
-        if (!loginDrawn) {
-          tft.fillScreen(TFT_BLACK);
+        static bool enteringPassword = false;
+        static String loginInput = "";
+        static String passwordInput = "";
+        static int selectedUser = -1;
 
-          tft.setCursor(20, 40);
-          tft.print("Ardudows");
+      if (!loginDrawn) {
+        tft.fillScreen(TFT_BLACK);
 
-          tft.setCursor(20, 100);
-          tft.print("User: ");
+        tft.setCursor(20, 40);
+        tft.print("Ardudows Login");
 
-          correctUser = Registry_Read_Value(
-            "/Ardudows/System/Registry/User.asf",
-            "Username");
+        tft.setCursor(20, 80);
+        tft.print("Username: ");
 
-          loginInput = "";
+        loginInput = "";
+        passwordInput = "";
+        selectedUser = -1;
+        enteringPassword = false;
 
-          loginDrawn = true;
+        loginDrawn = true;
+      }
+
+      if (key != KEY_NONE) {
+
+        // ================= ENTER =================
+        if (key == KEY_ENTER) {
+
+          // ----- 사용자명 입력중 -----
+          if (!enteringPassword) {
+
+            selectedUser = -1;
+
+            for (int i = 0; i < 100; i++) {
+
+              String user =
+              Registry_Read_Value(
+              "/Ardudows/System/Registry/User.asf",
+              ("User" + String(i)).c_str());
+
+              if (user == "")
+                break;
+
+              if (user == loginInput) {
+                selectedUser = i;
+                break;
+                  }
+              }
+
+              if (selectedUser != -1) {
+
+                enteringPassword = true;
+
+                tft.println();
+                tft.print("Password: ");
+
+                passwordInput = "";
+
+              }else {
+
+                tft.println();
+                tft.println("User not found");
+
+                tft.print("Username: ");
+
+                loginInput = "";
+              }
+            }
+
+            // ----- 비밀번호 입력중 -----
+            else {
+
+              String realPass =
+                  Registry_Read_Value(
+                  "/Ardudows/System/Registry/User.asf",
+                  ("Pass" + String(selectedUser)).c_str());
+
+                if (passwordInput == realPass) {
+
+                  currentUser =
+                Registry_Read_Value(
+                  "/Ardudows/System/Registry/User.asf",
+                  ("User" + String(selectedUser)).c_str());
+
+                  currentPath =
+                      ROOT_PATH +
+                      "/Users/" +
+                      currentUser;
+
+                  tft.println();
+                  tft.println("Welcome " + currentUser);
+
+                  delay(1000);
+
+                  bootState = BOOT_KERNEL;
+                  atkStarted = false;
+                  loginDrawn = false;
+                }else {
+
+                  tft.println();
+                  tft.println("Wrong password");
+
+                  tft.print("Password: ");
+
+                  passwordInput = "";
+                }
+            }
         }
 
-        if (key != KEY_NONE) {
-          if (key == KEY_ENTER) {
-            tft.println();
+        // ================= BACKSPACE =================
+        else if (key == KEY_BACKSPACE) {
 
-            if (loginInput == correctUser) {
-              tft.println("Welcome " + loginInput);
+            String* target =
+                enteringPassword ?
+                &passwordInput :
+                &loginInput;
 
-              currentUser = loginInput;
+            if (target->length() > 0) {
 
-              currentPath = ROOT_PATH + "/Users/" + currentUser;
+                target->remove(target->length() - 1);
 
-              bootState = BOOT_KERNEL;
-              atkStarted = false;
-            } else {
-              tft.println("Invalid user!");
-              tft.print("User: ");
-              loginInput = "";
+                int newX = tft.getCursorX() - 6;
+                int y = tft.getCursorY();
+
+                if (newX < 0)
+                    newX = 0;
+
+                tft.fillRect(
+                    newX,
+                    y,
+                    8,
+                    tft.fontHeight(),
+                    TFT_BLACK);
+
+                tft.setCursor(newX, y);
             }
-          }
-
-          else if (key == KEY_BACKSPACE) {
-            if (loginInput.length() > 0) {
-              // 1. 지워질 마지막 글자 한 개를 빼옵니다.
-              char lastChar = loginInput.charAt(loginInput.length() - 1);
-              loginInput.remove(loginInput.length() - 1);
-
-              // 2. TFT_eSPI 전용 함수로 현재 폰트/크기 기준의 정확한 너비(w)와 높이(h)를 구합니다.
-              String charStr = String(lastChar);
-              int16_t w = tft.textWidth(charStr);
-              int16_t h = tft.fontHeight();
-
-              // 방어 코드: 글자 너비가 비정상적으로 잡힐 경우 최소 기본 너비 지정
-              if (w <= 0) w = 6; 
-
-              // 3. 커서 좌표를 계산된 글자 너비(w)만큼 왼쪽으로 강제 이동
-              int newX = tft.getCursorX() - w;
-              int currentY = tft.getCursorY();
-              if (newX < 0) newX = 0; // 프롬프트 영역 침범 방지
-
-              // 4. TFT_eSPI는 문자 출력 시 y좌표 기준이 다를 수 있으므로, 
-              // 안전하게 커서 Y축 기준 상하 여유를 두고 검은색 사각형으로 밀어버립니다.
-              tft.fillRect(newX, currentY, w, h, TFT_BLACK);
-
-              // 5. 다음 글자가 그려질 커서 위치를 지워진 시작점으로 세팅
-              tft.setCursor(newX, currentY);
-            }
-          }
-
-          else if (key >= 32 && key <= 126) {
-            loginInput += key;
-            tft.print(key);
-          }
         }
 
-        break;
+        // ================= 일반 문자 =================
+        else if (key >= 32 && key <= 126) {
+
+            if (!enteringPassword) {
+
+                loginInput += (char)key;
+                tft.print((char)key);
+            }
+            else {
+
+                passwordInput += (char)key;
+                tft.print("*");
+            }
+        }
+      }
+
+      break;
       }
 
 
@@ -18178,6 +18405,7 @@ void Ardudows_StateMachine() {
   }
 }
 
+/*
 void CheckLogin() {
 
   String sectionName = "USER_" + loginUser;
@@ -18204,6 +18432,7 @@ void CheckLogin() {
 
   loginPassword = "";
 }
+*/
 
 //===부트로더===
 bool Boot_abf() {
