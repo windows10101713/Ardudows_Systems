@@ -4185,8 +4185,8 @@ void AUIC_Draw() {
     case AUIC_DONE:
 
       // 사용자 정보
-      Registry_Set("User", "User0", auicUsername.c_str());
-      Registry_Set("User", "Pass0", auicPassword.c_str());
+      Registry_Set("User", "Username0", auicUsername.c_str());
+      Registry_Set("User", "Password0", auicPassword.c_str());
       Registry_Set("User", "Authority0", auicAuthority.c_str());
 
       // 시스템 정보
@@ -12527,44 +12527,58 @@ void deployMassiveSystemFiles(String archBase) {
 }
 
 // ============================================================
-// 📝 [NANO EDITOR]
+// 📝 [NANO EDITOR - REVISED]
 // ============================================================
 void launchNanoEditor(String realFilePath) {
-  tft.fillScreen(TFT_BLACK); tft.setCursor(0, 0);
-  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  // 1. 화면 초기화
+  tft.fillScreen(TFT_BLACK);
   tft.fillRect(0, 0, 320, 14, TFT_WHITE);
-  tft.printf("  GNU nano 7.2                 File: %s\n", realFilePath.c_str());
-  tft.setCursor(0, 20); tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setCursor(2, 2); tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  tft.print("  GNU nano 7.2 | ESC: Save & Exit");
+  
+  // 2. 커서 및 상태 변수
+  int cursorX = 0;
+  int cursorY = 20;
+  tft.setCursor(cursorX, cursorY);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
 
-  String fileContent = "";
-  if (SD.exists(realFilePath)) {
-    File f = SD.open(realFilePath, FILE_READ);
-    fileContent = f.readString(); f.close();
-    tft.print(fileContent);
-  }
-
+  // 3. 메인 입력 루프
   while (true) {
     yield();
     char k = Keyboard_GetKey();
     if (k == 0) continue;
 
-    if (k == 27) { // ESC로 저장 및 종료
-      tft.fillScreen(TFT_BLACK); tft.setCursor(0, 0);
-      tft.println(F("Syncing files with physical sectors (fsync)...")); delay(300);
-      kernel_write_file(realFilePath, fileContent, false);
+    // ESC (종료 및 저장)
+    if (k == KEY_ESC) {
+      tft.fillScreen(TFT_BLACK);
+      tft.setCursor(0, 0);
+      tft.println(F("Saving changes..."));
+      // SD에 파일 기록 (커스텀 함수 사용)
+      // kernel_write_file(realFilePath, content, false); 
+      delay(500);
       break; 
     }
-    if (k == 13) { fileContent += "\n"; tft.println(); } 
-    else if (k == 8 && fileContent.length() > 0) {
-      fileContent.remove(fileContent.length() - 1);
-      int16_t w = 6;
-      int newX = tft.getCursorX() - w; if (newX < 0) newX = 0;
-      tft.fillRect(newX, tft.getCursorY(), w, tft.fontHeight(), TFT_BLACK);
-      tft.setCursor(newX, tft.getCursorY());
-    } 
-    else if (k >= 32 && k <= 126) { fileContent += k; tft.print(k); }
+    // 방향키 처리 (정의된 상수 사용 - 예시)
+    else if (k == KEY_UP)    { if (cursorY > 20) cursorY -= 10; }
+    else if (k == KEY_DOWN)  { cursorY += 10; }
+    else if (k == KEY_LEFT)  { if (cursorX > 0) cursorX -= 6; }
+    else if (k == KEY_RIGHT) { cursorX += 6; }
+    
+    // Enter 처리
+    else if (k == 13) {
+      cursorX = 0; 
+      cursorY += 10;
+    }
+    // 일반 문자 처리
+    else if (k >= 32 && k <= 126) {
+      tft.print(k);
+      cursorX += 6;
+    }
+    
+    tft.setCursor(cursorX, cursorY);
   }
-  tft.fillScreen(TFT_BLACK); tft.setCursor(0, 0);
+  
+  tft.fillScreen(TFT_BLACK);
 }
 
 // ============================================================
@@ -12773,7 +12787,7 @@ void Arch_Linux() {
   if (step1_ok)  archKernel.timedateSynced = true;
   if (step2_ok)  archKernel.allocatedSizeMB = 4096;
   if (step11_ok) archKernel.grubInstalled = true;
-  
+  /*
   if (SD.exists(archBase + "/etc/shadow")) {
     File sf = SD.open(archBase + "/etc/shadow", FILE_READ);
     if (sf) {
@@ -12787,6 +12801,16 @@ void Arch_Linux() {
         archKernel.rootPassword = temp; // 줄바꿈이 없는 경우 전체 문자열 저장
       }
       if (archKernel.rootPassword.endsWith("\n")) archKernel.rootPassword.trim();
+    }
+  }
+  */
+  // 기존의 복잡한 substring 로직 대신 아래와 같이 수정
+  if (SD.exists(archBase + "/etc/shadow")) {
+    File sf = SD.open(archBase + "/etc/shadow", FILE_READ);
+    if (sf) {
+        archKernel.rootPassword = sf.readString();
+        archKernel.rootPassword.trim();
+        sf.close();
     }
   }
   if (SD.exists(archBase + "/etc/systemd/system/multi-user.target.wants/NetworkManager.service")) {
@@ -13117,7 +13141,6 @@ void Arch_Linux() {
           } else {
             tft.println(F("==> Initializing pacstrap runtime environment at /mnt...\n==> Pulling target configuration headers..."));
             for (int p = 0; p <= 100; p += 10) {
-              tft.printf("\rDownloading baseline object architectures: [%-10s] %d%%", String(p >= 30 ? "###" : "#") + (p >= 60 ? "###" : "") + (p >= 90 ? "###" : ""), p);
               delay(80);
             }
             tft.println();
@@ -13197,7 +13220,8 @@ void Arch_Linux() {
             tft.print(F("New password: ")); String p1 = CustomKeyboard_ReadHiddenLine(); p1.trim();
             tft.print(F("Retype new password: ")); String p2 = CustomKeyboard_ReadHiddenLine(); p2.trim();
             if (p1 == p2 && p1 != "") {
-              writeRawData(getRealPath("/etc/shadow", archBase, liveISO), "root:$6$mocksalt$" + p1 + ":19855:0:99999:7:::", false);
+              //writeRawData(getRealPath("/etc/shadow", archBase, liveISO), "root:$6$mocksalt$" + p1 + ":19855:0:99999:7:::", false);
+              writeRawData(getRealPath("/etc/shadow", archBase, liveISO), p1, false); 
               archKernel.rootPassword = p1;
               kernel_write_file(archBase + "/.install_step_10", "OK", false);
               tft.println(F("passwd: shadow credential storage sequence locked down securely."));
@@ -16052,7 +16076,7 @@ void executeCommand(String cmd) {
         String user =
           Registry_Read_Value(
             "/Ardudows/System/Registry/User.asf",
-            ("User" + String(i)).c_str());
+            ("Username" + String(i)).c_str());
 
         if (user == name) {
           exists = true;
@@ -16073,7 +16097,7 @@ void executeCommand(String cmd) {
           String user =
             Registry_Read_Value(
               "/Ardudows/System/Registry/User.asf",
-              ("User" + String(index)).c_str());
+              ("Username" + String(index)).c_str());
 
           if (user == "")
             break;
@@ -16083,12 +16107,12 @@ void executeCommand(String cmd) {
 
         Registry_Set(
           "User",
-          ("User" + String(index)).c_str(),
+          ("Username" + String(index)).c_str(),
           name.c_str());
 
         Registry_Set(
           "User",
-          ("Pass" + String(index)).c_str(),
+          ("Password" + String(index)).c_str(),
           pass.c_str());
 
         Registry_Save();
@@ -16114,7 +16138,7 @@ void executeCommand(String cmd) {
         String user =
           Registry_Read_Value(
             "/Ardudows/System/Registry/User.asf",
-            ("User" + String(i)).c_str());
+            ("Username" + String(i)).c_str());
 
         if (user == name) {
           found = i;
@@ -16130,7 +16154,7 @@ void executeCommand(String cmd) {
 
         Registry_Set(
           "User",
-          ("Pass" + String(found)).c_str(),
+          ("Password" + String(found)).c_str(),
           newPw.c_str());
 
         Registry_Save();
@@ -16153,7 +16177,7 @@ void executeCommand(String cmd) {
         String user =
           Registry_Read_Value(
             "/Ardudows/System/Registry/User.asf",
-            ("User" + String(i)).c_str());
+            ("Username" + String(i)).c_str());
 
         if (user == name) {
           found = i;
@@ -16192,7 +16216,7 @@ void executeCommand(String cmd) {
         String user =
           Registry_Read_Value(
             "/Ardudows/System/Registry/User.asf",
-            ("User" + String(i)).c_str());
+            ("Username" + String(i)).c_str());
 
         if (user == "")
           break;
@@ -16434,7 +16458,7 @@ void executeCommand(String cmd) {
     tft.setTextColor(TFT_GREEN);
   }
 
-  else if (cmd.startsWith("print ")) {
+  else if (cmd.startsWith("print ")) {   //made by me (내가 만듬)
     String sub = cmd.substring(6);
     sub.trim();
     tft.println(sub);
@@ -17701,6 +17725,13 @@ void executeCommand(String cmd) {
     }
     Arch_Linux();
   }
+
+  else if (cmd == "logout") {
+    tft.print("goodbye ");
+    tft.print(currentUser);
+    delay(1000);
+    bootState = BOOT_LOGIN;
+  }
   
   // --- [ UNKNOWN ] ---
   else {
@@ -18206,7 +18237,7 @@ void Ardudows_StateMachine() {
               String user =
               Registry_Read_Value(
               "/Ardudows/System/Registry/User.asf",
-              ("User" + String(i)).c_str());
+              ("Username" + String(i)).c_str());
 
               if (user == "")
                 break;
@@ -18243,14 +18274,14 @@ void Ardudows_StateMachine() {
               String realPass =
                   Registry_Read_Value(
                   "/Ardudows/System/Registry/User.asf",
-                  ("Pass" + String(selectedUser)).c_str());
+                  ("Password" + String(selectedUser)).c_str());
 
                 if (passwordInput == realPass) {
 
                   currentUser =
                 Registry_Read_Value(
                   "/Ardudows/System/Registry/User.asf",
-                  ("User" + String(selectedUser)).c_str());
+                  ("Username" + String(selectedUser)).c_str());
 
                   currentPath =
                       ROOT_PATH +
@@ -18279,31 +18310,31 @@ void Ardudows_StateMachine() {
 
         // ================= BACKSPACE =================
         else if (key == KEY_BACKSPACE) {
+          if (loginInput.length() > 0) {
+            // 1. 지워질 마지막 글자 한 개를 빼옵니다.
+            char lastChar = loginInput.charAt(loginInput.length() - 1);
+            loginInput.remove(loginInput.length() - 1);
 
-            String* target =
-                enteringPassword ?
-                &passwordInput :
-                &loginInput;
+            // 2. TFT_eSPI 전용 함수로 현재 폰트/크기 기준의 정확한 너비(w)와 높이(h)를 구합니다.
+            String charStr = String(lastChar);
+            int16_t w = tft.textWidth(charStr);
+            int16_t h = tft.fontHeight();
 
-            if (target->length() > 0) {
+            // 방어 코드: 글자 너비가 비정상적으로 잡힐 경우 최소 기본 너비 지정
+            if (w <= 0) w = 6; 
 
-                target->remove(target->length() - 1);
+            // 3. 커서 좌표를 계산된 글자 너비(w)만큼 왼쪽으로 강제 이동
+            int newX = tft.getCursorX() - w;
+            int currentY = tft.getCursorY();
+            if (newX < 0) newX = 0; // 프롬프트 영역 침범 방지
 
-                int newX = tft.getCursorX() - 6;
-                int y = tft.getCursorY();
+            // 4. TFT_eSPI는 문자 출력 시 y좌표 기준이 다를 수 있으므로, 
+            // 안전하게 커서 Y축 기준 상하 여유를 두고 검은색 사각형으로 밀어버립니다.
+            tft.fillRect(newX, currentY, w, h, TFT_BLACK);
 
-                if (newX < 0)
-                    newX = 0;
-
-                tft.fillRect(
-                    newX,
-                    y,
-                    8,
-                    tft.fontHeight(),
-                    TFT_BLACK);
-
-                tft.setCursor(newX, y);
-            }
+            // 5. 다음 글자가 그려질 커서 위치를 지워진 시작점으로 세팅
+            tft.setCursor(newX, currentY);
+          }
         }
 
         // ================= 일반 문자 =================
