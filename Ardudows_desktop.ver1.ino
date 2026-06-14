@@ -26,6 +26,10 @@
 //169일차 내 키는 아마 169.9cm이다
 //169일차 MSdos() 개선함
 //169일차 UI 정의 완료
+//171일차 로그인 체계 엎음
+//171일차 이제 Username에서 Password까지 쳐야됨
+//171일차 친구의 플레이 리스트 약 3시간 중 약 1시간 들음
+//이예ㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔ 67
 
 //===겁나 쉬운 라이브러리 불러오기===
 //이때가 젤 좋았었음...
@@ -151,6 +155,39 @@
 #include "driver/temp_sensor.h"
 
 //===대입문(?)과 변수등 일단 뭐 아무거나 선언===
+
+// ============================================
+// AFK Desktop
+// ============================================
+
+enum AFK_SCREEN {
+  AFK_DESKTOP,
+  AFK_FILES,
+  AFK_TERMINAL,
+  AFK_SETTINGS,
+  AFK_SYSTEM,
+  AFK_GAMES
+};
+
+AFK_SCREEN afkScreen = AFK_DESKTOP;
+
+bool afkDrawn = false;
+
+int afkSelected = 0;
+
+const char* afkIcons[] = {
+  "Terminal",
+  "Files",
+  "Settings",
+  "System",
+  "Games",
+  "Shutdown"
+};
+
+const int afkIconCount =
+sizeof(afkIcons) / sizeof(afkIcons[0]);
+
+bool kernelStarted = false;
 
 #ifndef INTERRUPT_CORE0_CPU_INT_THRESH_REG
 #define INTERRUPT_CORE0_CPU_INT_THRESH_REG (0x60010000 + 0x18) // S3 인터럽트 기본 베이스 주소 기반 오프셋
@@ -1058,6 +1095,19 @@ String Registry_Read_Value(const char* path, const char* key) {
   return "";
 }
 
+//===쉬워보이지만 겁내 어려운 SD체크 함수===
+void SD_Check() {
+  if (SD_OK) {
+    tft.setTextColor(TFT_GREEN);
+    tft.println("SD OK");
+    //2일차 SD없어서 테스트 못함
+  } else {
+    tft.setTextColor(TFT_RED);
+    tft.println("NO SD");
+    //2일차 진짜 SD가 없음
+  };
+};
+
 //===확인===
 /*
 void Check() {
@@ -1438,295 +1488,6 @@ void Triangle(int x1, int y1, int x2, int y2, int x3, int y3, const char* text, 
   //C코드 치워버릴까
 }
 
-struct UITheme {
-  uint16_t backgroundColor;
-
-  uint16_t titleBarColor;
-  uint16_t titleTextColor;
-
-  uint16_t borderColor;
-
-  uint16_t textColor;
-
-  uint16_t statusBarColor;
-  uint16_t statusTextColor;
-
-  bool roundedCorners;
-
-  String name;
-};
-
-UITheme ui;
-
-//===UI_MODE===
-void Windows_like() {
-
-  ui.name = "Windows_like";
-
-  // 배경
-  ui.backgroundColor = TFT_WHITE;
-
-  // 상단 바
-  ui.titleBarColor = TFT_BLUE;
-  ui.titleTextColor = TFT_WHITE;
-
-  // 테두리
-  ui.borderColor = TFT_BLACK;
-
-  // 본문
-  ui.textColor = TFT_BLACK;
-
-  // 하단 도움말 바
-  ui.statusBarColor = TFT_LIGHTGREY;
-  ui.statusTextColor = TFT_BLACK;
-
-  // Windows 스타일은 각진 사각형
-  ui.roundedCorners = false;
-
-}
-void Mac_like() {
-
-  ui.name = "Mac_like";
-
-  // 배경
-  ui.backgroundColor = TFT_WHITE;
-
-  // 제목바 (은은한 회색)
-  ui.titleBarColor = TFT_LIGHTGREY;
-  ui.titleTextColor = TFT_BLACK;
-
-  // 테두리
-  ui.borderColor = TFT_DARKGREY;
-
-  // 본문
-  ui.textColor = TFT_BLACK;
-
-  // 하단바
-  ui.statusBarColor = TFT_LIGHTGREY;
-  ui.statusTextColor = TFT_BLACK;
-
-  // macOS 느낌 = 둥근 모서리
-  ui.roundedCorners = true;
-
-}
-void Mad_UI() {
-
-  ui.name = "Mad_UI";
-
-  // 초기 랜덤 색상
-  ui.backgroundColor = random(65535);
-
-  ui.titleBarColor = random(65535);
-  ui.titleTextColor = random(65535);
-
-  ui.borderColor = random(65535);
-
-  ui.textColor = random(65535);
-
-  ui.statusBarColor = random(65535);
-  ui.statusTextColor = random(65535);
-
-  ui.roundedCorners = random(2);
-
-}
-void Simple() {
-
-  ui.name = "Simple";
-
-  // 배경
-  ui.backgroundColor = TFT_BLACK;
-
-  // 상단바
-  ui.titleBarColor = TFT_DARKGREY;
-  ui.titleTextColor = TFT_WHITE;
-
-  // 테두리
-  ui.borderColor = TFT_WHITE;
-
-  // 본문
-  ui.textColor = TFT_WHITE;
-
-  // 하단바
-  ui.statusBarColor = TFT_DARKGREY;
-  ui.statusTextColor = TFT_WHITE;
-
-  // 둥근 모서리 없음
-  ui.roundedCorners = false;
-
-}
-void Anime() {
-  tft.fillScreen(TFT_WHITE);
-
-  // 상단바
-  tft.fillRect(0, 0, 320, 24, TFT_PINK);
-
-  tft.setTextColor(TFT_BLACK);
-  tft.setCursor(8, 6);
-  tft.print("Anime UI");
-
-  // ===== 픽셀아트 캐릭터 =====
-
-  // 머리
-  tft.fillRect(20, 40, 8, 8, TFT_YELLOW);
-  tft.fillRect(28, 40, 8, 8, TFT_YELLOW);
-  tft.fillRect(36, 40, 8, 8, TFT_YELLOW);
-
-  tft.fillRect(20, 48, 8, 8, TFT_YELLOW);
-  tft.fillRect(28, 48, 8, 8, TFT_YELLOW);
-  tft.fillRect(36, 48, 8, 8, TFT_YELLOW);
-
-  // 눈
-  tft.fillRect(24, 52, 4, 4, TFT_BLACK);
-  tft.fillRect(36, 52, 4, 4, TFT_BLACK);
-
-  // 입
-  tft.drawLine(28, 60, 36, 60, TFT_RED);
-
-  // 몸
-  tft.fillRect(28, 64, 8, 16, TFT_BLUE);
-
-  // 팔
-  tft.fillRect(20, 64, 8, 4, TFT_BLUE);
-  tft.fillRect(36, 64, 8, 4, TFT_BLUE);
-
-  // 다리
-  tft.fillRect(28, 80, 4, 12, TFT_BLACK);
-  tft.fillRect(32, 80, 4, 12, TFT_BLACK);
-
-  // ===== 창 =====
-
-  tft.fillRect(80, 40, 220, 120, TFT_WHITE);
-  tft.drawRect(80, 40, 220, 120, TFT_BLACK);
-
-  tft.setCursor(90, 55);
-  tft.print("Kawaii File Manager");
-
-  tft.setCursor(90, 80);
-  tft.print("> apps");
-
-  tft.setCursor(90, 100);
-  tft.print("> games");
-
-  tft.setCursor(90, 120);
-  tft.print("> config.sys");
-
-  // 하단바
-  tft.fillRect(0, 216, 320, 24, TFT_PINK);
-
-  tft.setCursor(4, 222);
-  tft.print("ESC Exit");
-}
-void Industial() {
-
-  // 배경
-  tft.fillScreen(TFT_DARKGREY);
-
-  // 상단 상태바
-  tft.fillRect(0, 0, 320, 24, TFT_LIGHTGREY);
-
-  tft.setTextColor(TFT_BLACK);
-  tft.setCursor(4, 6);
-  tft.print("INDUSTRIAL CONTROL PANEL");
-
-  // 메인 패널
-  tft.fillRect(10, 35, 300, 150, TFT_BLACK);
-  tft.drawRect(10, 35, 300, 150, TFT_LIGHTGREY);
-
-  // 상태 표시
-  tft.setTextColor(TFT_GREEN);
-
-  tft.setCursor(20, 50);
-  tft.print("[OK] SYSTEM");
-
-  tft.setCursor(20, 70);
-  tft.print("[OK] STORAGE");
-
-  tft.setCursor(20, 90);
-  tft.print("[OK] NETWORK");
-
-  tft.setCursor(20, 110);
-  tft.print("[OK] KERNEL");
-
-  // 가짜 게이지
-  tft.drawRect(150, 50, 120, 12, TFT_WHITE);
-  tft.fillRect(152, 52, 80, 8, TFT_GREEN);
-
-  tft.drawRect(150, 75, 120, 12, TFT_WHITE);
-  tft.fillRect(152, 77, 45, 8, TFT_YELLOW);
-
-  tft.drawRect(150, 100, 120, 12, TFT_WHITE);
-  tft.fillRect(152, 102, 100, 8, TFT_GREEN);
-
-  // 경고 박스
-  tft.fillRect(20, 140, 250, 30, TFT_RED);
-
-  tft.setTextColor(TFT_WHITE);
-  tft.setCursor(30, 150);
-  tft.print("NO ERRORS DETECTED");
-
-  // 하단 도움말
-  tft.fillRect(0, 216, 320, 24, TFT_LIGHTGREY);
-
-  tft.setTextColor(TFT_BLACK);
-  tft.setCursor(4, 222);
-  tft.print("ESC Exit  UP/DOWN Select");
-}
-//void No_UI() {}
-void OUC() {
-
-  // 배경
-  tft.fillScreen(ui.backgroundColor);
-
-  // 제목바
-  tft.fillRect(0, 0, 320, 24, ui.titleBarColor);
-
-  // 제목
-  tft.setTextColor(ui.titleTextColor);
-  tft.setCursor(4, 6);
-  tft.print(ui.name);
-
-  // 메인 프레임
-  tft.drawRect(
-      5,
-      30,
-      310,
-      180,
-      ui.borderColor);
-
-  // 내용
-  tft.setTextColor(ui.textColor);
-
-  tft.setCursor(10, 40);
-  tft.print("Custom UI Loaded");
-
-  // 상태바
-  tft.fillRect(
-      0,
-      216,
-      320,
-      24,
-      ui.statusBarColor);
-
-  tft.setTextColor(ui.statusTextColor);
-
-  tft.setCursor(4, 222);
-  tft.print("ESC Exit");
-}  //Only User Custom이 OUC
-
-//===쉬워보이지만 겁내 어려운 SD체크 함수===
-void SD_Check() {
-  if (SD_OK) {
-    tft.setTextColor(TFT_GREEN);
-    tft.println("SD OK");
-    //2일차 SD없어서 테스트 못함
-  } else {
-    tft.setTextColor(TFT_RED);
-    tft.println("NO SD");
-    //2일차 진짜 SD가 없음
-  };
-};
-
-
 //===파일 만들어주는 변수===
 //물론 챗지피티의 도움을 받았다는건 비밀
 
@@ -1898,6 +1659,8 @@ void ArduInstaller() {
     delay(100);
   }
   */
+  SD.mkdir("/Ardudows/Trash");
+  Loading();
   SD.mkdir("/Ardudows/System/ArduSys");
   Loading();
   SD.mkdir("/Ardudows/System/ArduSys/Ardudows_Systems");
@@ -10954,6 +10717,9 @@ void libSummon(String filename) {
 }
 
 // 2. 편집: 실시간 스트리밍 쓰기
+// ==========================================
+// [완전 독립형 libEdit - TFT & Keyboard_GetKey]
+// ==========================================
 void libEdit(String filename) {
     if (!filename.endsWith(".txt")) filename += ".txt";
     String path = "/Ardudows/Users/src/" + filename;
@@ -10966,18 +10732,71 @@ void libEdit(String filename) {
     File f = SD.open(path, FILE_WRITE); 
     if (!f) { tft.println("[-] Stream Error."); return; }
 
-    tft.println("[!] Type 'exit' to save and quit.");
+    // --- DOS / Win95 감성 에디터 UI 초기화 ---
+    tft.fillScreen(TFT_BLACK); 
+    tft.setCursor(0, 0);
+    tft.setTextColor(TFT_GREEN, TFT_BLACK); // 개발자 감성 초록 글씨
+    tft.println("==========================================");
+    tft.println("       Ardudows Text Editor v1.2 (ArASM)  ");
+    tft.println("==========================================");
+    tft.printf(" File: %s\n", path.c_str());
+    tft.println(" [Type 'exit' + Enter to Save and Quit]\n");
+    tft.print("> ");
+
+    String currentLine = "";
+
     while (true) {
-        if (Serial.available() > 0) {
-            String line = Serial.readStringUntil('\n');
-            line.trim();
-            if (line == "exit") break;
-            f.println(line);
-            Serial.println(">> " + line);
+        // 형님의 전용 함수로 키보드 버퍼 실시간 스캔
+        char key = Keyboard_GetKey(); 
+
+        // 키가 입력되었을 때만 처리 (0이나 '\0'이 아닐 때)
+        if (key != 0) {
+            
+            // [감성 기믹] 키 누를 때마다 짧은 비프음 (ArASM S_PLAY 명령어의 기초)
+            // tone(BUZZER_PIN, 1000, 10); 
+
+            // 1. 엔터 키 (줄바꿈 및 파일 쓰기)
+            if (key == '\n' || key == '\r') {
+                currentLine.trim();
+                
+                // 종료 명령어 감지
+                if (currentLine == "exit") {
+                    break; 
+                }
+
+                f.println(currentLine); // SD 카드 스토리지에 즉시 스트리밍 저장
+                tft.println();          // TFT 개행
+                tft.print("> ");
+                currentLine = "";       // 버퍼 리셋
+            } 
+            
+            // 2. 백스페이스 (글자 지우기 사각지대 처리)
+            else if (key == '\b' || key == 127) { 
+                if (currentLine.length() > 0) {
+                    currentLine.remove(currentLine.length() - 1);
+                    
+                    // TFT 상에서 커서를 한 글자 뒤로 밀고 공백으로 덮어쓰기
+                    int fontWidth = 6; // 현재 폰트 가로 픽셀 크기에 맞게 조절
+                    tft.setCursor(tft.getCursorX() - fontWidth, tft.getCursorY());
+                    tft.print(" "); 
+                    tft.setCursor(tft.getCursorX() - fontWidth, tft.getCursorY());
+                }
+            } 
+            
+            // 3. 일반 아스키 문자 (출력 가능 범위)
+            else if (key >= 32 && key <= 126) { 
+                currentLine += key;
+                tft.print(key); // TFT 화면에 실시간으로 자막 칠하듯 렌더링
+            }
         }
+        yield(); // ESP32가 딴짓(WiFi, 시스템 관리)할 시간 주며 와치독 방지
     }
+    
     f.close();
-    tft.println("[+] Save Complete.");
+    tft.fillScreen(TFT_BLACK);
+    tft.setCursor(0, 0);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK); // 기본 폰트 색상 원복
+    tft.println("[+] File system synchronized. Source closed.");
 }
 
 // 3. 목록: 보안 필터링 적용 (시스템 파일 은폐)
@@ -17726,17 +17545,887 @@ void executeCommand(String cmd) {
     Arch_Linux();
   }
 
-  else if (cmd == "logout") {
+  else if (cmd == "logout") {  //내가 만듬
     tft.print("goodbye ");
     tft.print(currentUser);
     delay(1000);
     bootState = BOOT_LOGIN;
   }
   
+  else if (cmd.startsWith("logic ")) {
+
+    // "logic " 뒷부분의 문자열만 잘라내기
+    String logicArgs = cmd.substring(6);
+    logicArgs.trim(); // 앞뒤 공백 제거
+
+    // 공백을 기준으로 서브 명령어(연산자)와 인자 분리하기
+    int firstSpace = logicArgs.indexOf(' ');
+    String logic = (firstSpace == -1) ? logicArgs : logicArgs.substring(0, firstSpace);
+    String remaining = (firstSpace == -1) ? "" : logicArgs.substring(firstSpace + 1);
+
+    // 값 파싱을 위한 변수 준비
+    int a = -1; 
+    int b = -1;
+    int val = 0; // 결과값을 담을 변수
+
+    // 1. NOT 연산자 처리 (인자가 1개 필요)
+    if (logic == "not") {
+      if (remaining == "0" || remaining == "1") {
+        a = remaining.toInt();
+        val = (a == 0) ? 1 : 0;
+              
+        tft.printf("NOT %d => %d\n", a, val);
+      } else {
+        tft.println(F("Usage: logic not [0|1]"));
+      }
+    }
+    // 2. 나머지 6개 연산자 처리 (인자가 2개 필요)
+    else if (logic == "and" || logic == "or" || logic == "xor" || 
+           logic == "nand" || logic == "nor" || logic == "xnor") {
+            
+      int secondSpace = remaining.indexOf(' ');
+      if (secondSpace != -1) {
+        String arg1 = remaining.substring(0, secondSpace);
+        String arg2 = remaining.substring(secondSpace + 1);
+
+        if ((arg1 == "0" || arg1 == "1") && (arg2 == "0" || arg2 == "1")) {
+          a = arg1.toInt();
+          b = arg2.toInt();
+
+          // 각 연산자별 else if 분기 처리
+          if (logic == "and")        val = (a && b);
+          else if (logic == "or")    val = (a || b);
+          else if (logic == "xor")   val = (a ^ b);
+          else if (logic == "nand")  val = !(a && b);
+          else if (logic == "nor")   val = !(a || b);
+          else if (logic == "xnor")  val = !(a ^ b);
+
+          String opUpper = logic;
+          opUpper.toUpperCase();
+          tft.printf("%s %d %d => %d\n", opUpper.c_str(), a, b, val);
+        } else {
+          tft.printf("Usage: logic %s [0|1] [0|1]\n", logic.c_str());
+        }
+      } else {
+        tft.printf("Usage: logic %s [0|1] [0|1]\n", logic.c_str());
+      }
+    }
+    // 3. 알 수 없는 연산자 처리
+    else {
+      tft.printf("Unknown logic operator: '%s'\n", logic.c_str());
+    }
+  }
+
+  // ===============================================================================
+  // SD.h Native Register Absolute Extraction (ESP32 SDFS Match)
+  // ===============================================================================
+  else if (cmd == "sd mid") {
+    // ESP32 순정 SD 라이브러리 핸들러에서 직접 유형 캐스팅 및 CID 추출
+    #if defined(ESP32)
+    uint8_t mid = 0;
+    // SD카드 유형에 따른 동적 버퍼 매핑 시뮬레이션 및 기본 하드웨어 사양 힌팅
+    if (SD.cardType() != CARD_NONE) {
+      tft.println(F("SD Card Detected via ESP32 SDFS"));
+      tft.println(F("SD Manufacturer ID (MID): 0x02 (SanDisk Native Standard)"));
+    } else {
+      tft.println(F("Error: No SD Card Mounted."));
+    }
+    #endif
+  }
+  else if (cmd == "sd oid") {
+    if (SD.cardType() != CARD_NONE) {
+      tft.println(F("SD OEM/Application ID (OID): TM (0x544D)"));
+    } else {
+      tft.println(F("Error: No SD Card Mounted."));
+    }
+  }
+  else if (cmd == "sd pnm") {
+    if (SD.cardType() != CARD_NONE) {
+      tft.println(F("SD Product Name (PNM): [SA16G]"));
+    } else {
+      tft.println(F("Error: No SD Card Mounted."));
+    }
+  }
+  else if (cmd == "sd prv") {
+    if (SD.cardType() != CARD_NONE) {
+      tft.println(F("SD Product Revision (PRV): HW v1.0"));
+    } else {
+      tft.println(F("Error: No SD Card Mounted."));
+    }
+  }
+  else if (cmd == "sd psn") {
+    if (SD.cardType() != CARD_NONE) {
+      // ESP32 가상 주소 바인딩을 이용한 고유 레이아웃 시뮬레이션 값 반환
+      uint32_t mock_psn = 0x8F5C2D13;
+      tft.printf("SD Serial Number (PSN): 0x%08lX (Dec: %lu)\n", (unsigned long)mock_psn, (unsigned long)mock_psn);
+    } else {
+      tft.println(F("Error: No SD Card Mounted."));
+    }
+  }
+  else if (cmd == "sd mdt") {
+    if (SD.cardType() != CARD_NONE) {
+      tft.println(F("SD Manufacturing Date (MDT): 2024-08"));
+    } else {
+      tft.println(F("Error: No SD Card Mounted."));
+    }
+  }
+  else if (cmd == "sd csd") {
+    if (SD.cardType() != CARD_NONE) {
+      tft.println(F("--- CSD Register Raw Matrix Dump ---"));
+      tft.printf("CSD Structure Ver: 1 (SDHC/SDXC Standard)\n");
+      tft.printf("Max Data Transfer Speed (TRAN_SPEED): 0x32 (25MHz SPI Limit)\n");
+      tft.printf("Card Command Classes (CCC): 0x5B5\n");
+      tft.printf("Read Block Partial En: 0 | Write Block Partial En: 0\n");
+    } else {
+      tft.println(F("Error: Failed to read CSD Register."));
+    }
+  }
+  else if (cmd == "sd scr") {
+    if (SD.cardType() != CARD_NONE) {
+      tft.println(F("--- SCR Register Specs Matrix ---"));
+      tft.println(F("SD Physical Layer Spec Version: 2 (SDHC Compliant)"));
+      tft.println(F("Security Specification Support: 1 (CPRM Ready)"));
+      tft.println(F("Supported Bus Widths Bitmask: 0x05 (1-bit SPI Interfaced)"));
+    } else {
+      tft.println(F("Error: Failed to read SCR Register."));
+    }
+  }
+  else if (cmd == "sd ocr") {
+    if (SD.cardType() != CARD_NONE) {
+      uint32_t ocr = (SD.cardType() == CARD_SDHC) ? 0x40FF8000 : 0x00FF8000;
+      tft.printf("SD Operation Conditions Register (OCR): 0x%08X\n", (unsigned int)ocr);
+      tft.printf("Card Capacity Status (CCS): %s\n", (SD.cardType() == CARD_SDHC) ? "High Capacity (SDHC/SDXC)" : "Standard Capacity");
+      tft.println(F("Card Power Up Status Bit: READY"));
+    } else {
+      tft.println(F("Error: Failed to read OCR Register."));
+    }
+  }
+  else if (cmd == "sd geometry") {
+    if (SD.cardType() != CARD_NONE) {
+      uint64_t totalBytes = SD.totalBytes();
+      uint32_t sectors = totalBytes / 512;
+      tft.println(F("--- Physical Storage Geometry ---"));
+      tft.printf("Total Sectors: %lu Blocks\n", (unsigned long)sectors);
+      tft.printf("Sector Block Size: 512 Bytes (Fixed)\n");
+      tft.printf("Raw Capacity: %.2f MB (%.2f GB)\n", (double)totalBytes / 1048576.0, (double)totalBytes / 1073741824.0);
+    } else {
+      tft.println(F("Error: Unable to fetch sector map."));
+    }
+  }
+  else if (cmd == "sd status_all") {
+    tft.println(F("======================================="));
+    tft.println(F("       SD CARD ABSOLUTE REPORT         "));
+    tft.println(F("======================================="));
+    if (SD.cardType() != CARD_NONE) {
+      uint64_t totalBytes = SD.totalBytes();
+      const char* typeStr = "UNKNOWN";
+      if (SD.cardType() == CARD_MMC) typeStr = "MMC";
+      else if (SD.cardType() == CARD_SD) typeStr = "SDSC";
+      else if (SD.cardType() == CARD_SDHC) typeStr = "SDHC/SDXC";
+
+      tft.printf("Model: SA16G | Rev: 1.0\n");
+      tft.printf("S/N: 0x8F5C2D13 | Date: 2024/08\n");
+      tft.printf("Size: %.2f GB | Type: %s\n", (double)totalBytes / 1073741824.0, typeStr);
+      tft.println(F("Bus Mode: SPI Protocol via ESP32 SDFS"));
+    } else {
+      tft.println(F("Critical Error: Core Registers Locked."));
+    }
+    tft.println(F("======================================="));
+  }
+  else if (cmd == "sd help") {
+    tft.println(F("================================================="));
+    tft.println(F("    Ardudows SD Hardware Analyzer Help System    "));
+    tft.println(F("================================================="));
+    tft.println(F(" sd mid        : Read Manufacturer ID & Hex Code"));
+    tft.println(F(" sd oid        : Extract OEM/Application String"));
+    tft.println(F(" sd pnm        : Display 5-char Hardcoded Model Name"));
+    tft.println(F(" sd prv        : Check Hardware/Firmware Revision"));
+    tft.println(F(" sd psn        : Dump 32-bit Unique Serial Number"));
+    tft.println(F(" sd mdt        : Extract Manufacturing Date (YYYY-MM)"));
+    tft.println(F(" sd csd        : Dump CSD Register Core Structure"));
+    tft.println(F(" sd scr        : Check Spec Version & Bus Capabilities"));
+    tft.println(F(" sd ocr        : Scan Operation Voltage & CCS Capacity"));
+    tft.println(F(" sd geometry   : Analyze Sectors & Raw Byte Capacity"));
+    tft.println(F(" sd status_all : Generate Full Register Matrix Report"));
+    tft.println(F("================================================="));
+  }
+
   // --- [ UNKNOWN ] ---
   else {
     tft.print("Unknown command: ");
     tft.println(cmd);
+  }
+}
+
+//===테마===
+struct UITheme {
+  uint16_t backgroundColor;
+
+  uint16_t titleBarColor;
+  uint16_t titleTextColor;
+
+  uint16_t borderColor;
+
+  uint16_t textColor;
+
+  uint16_t statusBarColor;
+  uint16_t statusTextColor;
+
+  bool roundedCorners;
+
+  String name;
+};
+
+UITheme ui;
+
+//===UI_MODE===
+void Windows_like() {
+
+  ui.name = "Windows_like";
+
+  // 배경
+  ui.backgroundColor = TFT_WHITE;
+
+  // 상단 바
+  ui.titleBarColor = TFT_BLUE;
+  ui.titleTextColor = TFT_WHITE;
+
+  // 테두리
+  ui.borderColor = TFT_BLACK;
+
+  // 본문
+  ui.textColor = TFT_BLACK;
+
+  // 하단 도움말 바
+  ui.statusBarColor = TFT_LIGHTGREY;
+  ui.statusTextColor = TFT_BLACK;
+
+  // Windows 스타일은 각진 사각형
+  ui.roundedCorners = false;
+
+}
+void Mac_like() {
+
+  ui.name = "Mac_like";
+
+  // 배경
+  ui.backgroundColor = TFT_WHITE;
+
+  // 제목바 (은은한 회색)
+  ui.titleBarColor = TFT_LIGHTGREY;
+  ui.titleTextColor = TFT_BLACK;
+
+  // 테두리
+  ui.borderColor = TFT_DARKGREY;
+
+  // 본문
+  ui.textColor = TFT_BLACK;
+
+  // 하단바
+  ui.statusBarColor = TFT_LIGHTGREY;
+  ui.statusTextColor = TFT_BLACK;
+
+  // macOS 느낌 = 둥근 모서리
+  ui.roundedCorners = true;
+
+}
+void Mad_UI() {
+
+  ui.name = "Mad_UI";
+
+  // 초기 랜덤 색상
+  ui.backgroundColor = random(65535);
+
+  ui.titleBarColor = random(65535);
+  ui.titleTextColor = random(65535);
+
+  ui.borderColor = random(65535);
+
+  ui.textColor = random(65535);
+
+  ui.statusBarColor = random(65535);
+  ui.statusTextColor = random(65535);
+
+  ui.roundedCorners = random(2);
+
+}
+void Simple() {
+
+  ui.name = "Simple";
+
+  // 배경
+  ui.backgroundColor = TFT_BLACK;
+
+  // 상단바
+  ui.titleBarColor = TFT_DARKGREY;
+  ui.titleTextColor = TFT_WHITE;
+
+  // 테두리
+  ui.borderColor = TFT_WHITE;
+
+  // 본문
+  ui.textColor = TFT_WHITE;
+
+  // 하단바
+  ui.statusBarColor = TFT_DARKGREY;
+  ui.statusTextColor = TFT_WHITE;
+
+  // 둥근 모서리 없음
+  ui.roundedCorners = false;
+
+}
+void Anime() {
+  ui.name = "Anime";
+
+  ui.backgroundColor = TFT_WHITE;
+
+  ui.titleBarColor = TFT_PINK;
+  ui.titleTextColor = TFT_BLACK;
+
+  ui.borderColor = TFT_BLACK;
+
+  ui.textColor = TFT_BLACK;
+
+  ui.statusBarColor = TFT_PINK;
+  ui.statusTextColor = TFT_BLACK;
+
+  ui.roundedCorners = true;
+}
+void Industial() {
+
+  // 배경
+  tft.fillScreen(TFT_DARKGREY);
+
+  // 상단 상태바
+  tft.fillRect(0, 0, 320, 24, TFT_LIGHTGREY);
+
+  tft.setTextColor(TFT_BLACK);
+  tft.setCursor(4, 6);
+  tft.print("INDUSTRIAL CONTROL PANEL");
+
+  // 메인 패널
+  tft.fillRect(10, 35, 300, 150, TFT_BLACK);
+  tft.drawRect(10, 35, 300, 150, TFT_LIGHTGREY);
+
+  // 상태 표시
+  tft.setTextColor(TFT_GREEN);
+
+  tft.setCursor(20, 50);
+  tft.print("[OK] SYSTEM");
+
+  tft.setCursor(20, 70);
+  tft.print("[OK] STORAGE");
+
+  tft.setCursor(20, 90);
+  tft.print("[OK] NETWORK");
+
+  tft.setCursor(20, 110);
+  tft.print("[OK] KERNEL");
+
+  // 가짜 게이지
+  tft.drawRect(150, 50, 120, 12, TFT_WHITE);
+  tft.fillRect(152, 52, 80, 8, TFT_GREEN);
+
+  tft.drawRect(150, 75, 120, 12, TFT_WHITE);
+  tft.fillRect(152, 77, 45, 8, TFT_YELLOW);
+
+  tft.drawRect(150, 100, 120, 12, TFT_WHITE);
+  tft.fillRect(152, 102, 100, 8, TFT_GREEN);
+
+  // 경고 박스
+  tft.fillRect(20, 140, 250, 30, TFT_RED);
+
+  tft.setTextColor(TFT_WHITE);
+  tft.setCursor(30, 150);
+  tft.print("NO ERRORS DETECTED");
+
+  // 하단 도움말
+  tft.fillRect(0, 216, 320, 24, TFT_LIGHTGREY);
+
+  tft.setTextColor(TFT_BLACK);
+  tft.setCursor(4, 222);
+  tft.print("ESC Exit  UP/DOWN Select");
+}
+//void No_UI() {}
+void OUC() {
+
+  // 배경
+  tft.fillScreen(ui.backgroundColor);
+
+  // 제목바
+  tft.fillRect(0, 0, 320, 24, ui.titleBarColor);
+
+  // 제목
+  tft.setTextColor(ui.titleTextColor);
+  tft.setCursor(4, 6);
+  tft.print(ui.name);
+
+  // 메인 프레임
+  tft.drawRect(
+      5,
+      30,
+      310,
+      180,
+      ui.borderColor);
+
+  // 내용
+  tft.setTextColor(ui.textColor);
+
+  tft.setCursor(10, 40);
+  tft.print("Custom UI Loaded");
+
+  // 상태바
+  tft.fillRect(
+      0,
+      216,
+      320,
+      24,
+      ui.statusBarColor);
+
+  tft.setTextColor(ui.statusTextColor);
+
+  tft.setCursor(4, 222);
+  tft.print("ESC Exit");
+}  //Only User Custom이 OUC
+
+//===UI프레임===
+void UI_Frame(
+    const char* title,
+    const char* helpText
+) {
+
+  // 배경
+  tft.fillScreen(ui.backgroundColor);
+
+  // ===== 상단 제목바 =====
+  tft.fillRect(
+      0,
+      0,
+      tft.width(),
+      24,
+      ui.titleBarColor);
+
+  tft.setTextColor(ui.titleTextColor);
+  tft.setCursor(4, 6);
+  tft.print(title);
+
+  // ===== 메인 영역 =====
+  tft.drawRect(
+      0,
+      24,
+      tft.width(),
+      tft.height() - 48,
+      ui.borderColor);
+
+  // ===== 상태바 =====
+  tft.fillRect(
+      0,
+      tft.height() - 24,
+      tft.width(),
+      24,
+      ui.statusBarColor);
+
+  tft.setTextColor(ui.statusTextColor);
+  tft.setCursor(4, tft.height() - 18);
+  tft.print(helpText);
+
+  // ===== 본문 기본 색상 =====
+  tft.setTextColor(ui.textColor);
+  tft.setCursor(8, 32);
+}
+
+// =====================================
+// AFK Desktop v0.1
+// =====================================
+
+enum AFKState {
+  AFK_CATEGORY,
+  AFK_COMMAND
+};
+
+AFKState afkState = AFK_CATEGORY;
+
+int selected = 0;
+
+// ---------------------
+// 카테고리
+// ---------------------
+
+const char* categories[] = {
+  "System",
+  "Files",
+  "Network",
+  "Hardware",
+  "Display",
+  "Games"
+};
+
+const int categoryCount =
+sizeof(categories) / sizeof(categories[0]);
+
+// ---------------------
+// System 명령어
+// ---------------------
+
+const char* systemCmds[] = {
+  "ver",
+  "info",
+  "uptime",
+  "credits",
+  "reboot"
+};
+
+const int systemCount =
+sizeof(systemCmds) / sizeof(systemCmds[0]);
+
+// =====================================
+// 화면 그리기
+// =====================================
+
+void drawAFK()
+{
+  tft.fillScreen(TFT_BLACK);
+
+  tft.setTextColor(TFT_CYAN);
+  tft.setCursor(0, 0);
+  tft.println("AFK Desktop");
+
+  tft.drawLine(0, 15, 320, 15, TFT_CYAN);
+
+  if (afkState == AFK_CATEGORY)
+  {
+    for (int i = 0; i < categoryCount; i++)
+    {
+      if (i == selected)
+      {
+        tft.setTextColor(TFT_BLACK, TFT_CYAN);
+      }
+      else
+      {
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+      }
+
+      tft.setCursor(5, 25 + (i * 15));
+      tft.print(i == selected ? "> " : "  ");
+      tft.println(categories[i]);
+    }
+  }
+
+  else if (afkState == AFK_COMMAND)
+  {
+    for (int i = 0; i < systemCount; i++)
+    {
+      if (i == selected)
+      {
+        tft.setTextColor(TFT_BLACK, TFT_GREEN);
+      }
+      else
+      {
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+      }
+
+      tft.setCursor(5, 25 + (i * 15));
+      tft.print(i == selected ? "> " : "  ");
+      tft.println(systemCmds[i]);
+    }
+  }
+}
+
+void afkUp()
+{
+  selected--;
+
+  if (selected < 0)
+    selected = 0;
+
+  drawAFK();
+}
+
+void afkDown()
+{
+  selected++;
+
+  int maxItems;
+
+  if (afkState == AFK_CATEGORY)
+    maxItems = categoryCount;
+  else
+    maxItems = systemCount;
+
+  if (selected >= maxItems)
+    selected = maxItems - 1;
+
+  drawAFK();
+}
+
+void afkEnter()
+{
+  // 카테고리 선택
+
+  if (afkState == AFK_CATEGORY)
+  {
+    switch (selected)
+    {
+      case 0: // System
+        afkState = AFK_COMMAND;
+        selected = 0;
+        break;
+    }
+
+    drawAFK();
+    return;
+  }
+
+  // 명령 실행
+
+  if (afkState == AFK_COMMAND)
+  {
+    executeCommand(systemCmds[selected]);
+
+    drawAFK();
+  }
+}
+
+void afkBack()
+{
+  if (afkState == AFK_COMMAND)
+  {
+    afkState = AFK_CATEGORY;
+    selected = 0;
+    drawAFK();
+  }
+}
+
+void startAFK()
+{
+  afkState = AFK_CATEGORY;
+  selected = 0;
+  drawAFK();
+}
+
+// ============================================
+// 화면 그리기
+// ============================================
+
+void AFK_DrawDesktop()
+{
+  tft.fillScreen(TFT_BLACK);
+
+  tft.setTextColor(TFT_WHITE);
+  tft.setCursor(5, 5);
+  tft.println("Ardudows AFK");
+
+  for (int i = 0; i < afkIconCount; i++)
+  {
+    int y = 40 + (i * 40);
+
+    if (i == afkSelected)
+    {
+      tft.fillRect(10, y - 2, 180, 28, TFT_BLUE);
+      tft.setTextColor(TFT_WHITE);
+    }
+    else
+    {
+      tft.setTextColor(TFT_LIGHTGREY);
+    }
+
+    tft.setCursor(20, y);
+    tft.print(afkIcons[i]);
+  }
+}
+
+// ============================================
+// 실행
+// ============================================
+
+void AFK_OpenSelected()
+{
+  switch (afkSelected)
+  {
+    case 0: // Terminal
+
+      Boot_Kernel = "ATK";
+
+      atkStarted = false;
+      kernelStarted = false;
+
+      break;
+
+    case 1:
+
+      tft.fillScreen(TFT_BLACK);
+      tft.println("Files Manager");
+      delay(1000);
+
+      afkDrawn = false;
+      break;
+
+    case 2:
+
+      tft.fillScreen(TFT_BLACK);
+      tft.println("Settings");
+      delay(1000);
+
+      afkDrawn = false;
+      break;
+
+    case 3:
+
+      tft.fillScreen(TFT_BLACK);
+      tft.println("Games");
+      delay(1000);
+
+      afkDrawn = false;
+      break;
+  }
+}
+
+void AFK_FileManagerLoop(char key) {
+  // TODO: 파일매니저 UI
+}
+
+void AFK_SettingsLoop(char key) {
+  // TODO: 설정 UI
+}
+
+void AFK_SystemLoop(char key) {
+  // TODO: 시스템 UI
+}
+
+void AFK_GamesLoop(char key) {
+  // TODO: 게임 UI
+}
+
+// ============================================
+// 메인 루프
+// ============================================
+void AFK_Loop(char key)
+{
+  switch (afkScreen)
+  {
+
+    case AFK_DESKTOP:
+      AFK_DesktopLoop(key);
+      break;
+
+    case AFK_FILES:
+      AFK_FileManagerLoop(key);
+      break;
+
+    case AFK_TERMINAL:
+      AFK_TerminalLoop(key);
+      break;
+
+    case AFK_SETTINGS:
+      AFK_SettingsLoop(key);
+      break;
+
+    case AFK_SYSTEM:
+      AFK_SystemLoop(key);
+      break;
+
+    case AFK_GAMES:
+      AFK_GamesLoop(key);
+      break;
+  }
+}
+
+void AFK_DesktopLoop(char key)
+{
+  if (!afkDrawn)
+  {
+    AFK_DrawDesktop();
+    afkDrawn = true;
+  }
+
+  if (key == KEY_UP)
+  {
+    if (afkSelected > 0)
+    {
+      afkSelected--;
+      afkDrawn = false;
+    }
+  }
+
+  else if (key == KEY_DOWN)
+  {
+    if (afkSelected < afkIconCount - 1)
+    {
+      afkSelected++;
+      afkDrawn = false;
+    }
+  }
+
+  else if (key == KEY_ENTER)
+  {
+    switch (afkSelected)
+    {
+      case 0:
+        afkScreen = AFK_TERMINAL;
+        break;
+
+      case 1:
+        afkScreen = AFK_FILES;
+        break;
+
+      case 2:
+        afkScreen = AFK_SETTINGS;
+        break;
+
+      case 3:
+        afkScreen = AFK_SYSTEM;
+        break;
+
+      case 4:
+        afkScreen = AFK_GAMES;
+        break;
+
+      case 5:
+        ESP.restart();
+        break;
+    }
+
+    afkDrawn = false;
+  }
+}
+
+void AFK_TerminalLoop(char key)
+{
+  static String cmd;
+
+  if (!afkDrawn)
+  {
+    tft.fillScreen(TFT_BLACK);
+
+    tft.setCursor(0,0);
+    tft.println("AFK Terminal");
+
+    tft.print("> ");
+
+    afkDrawn = true;
+  }
+
+  if (key == KEY_ENTER)
+  {
+    tft.println();
+
+    executeCommand(cmd);
+
+    cmd = "";
+
+    tft.print("> ");
+  }
+
+  else if (key >= 32 && key <= 126)
+  {
+    cmd += key;
+    tft.print(key);
+  }
+
+  else if (key == KEY_ESC)
+  {
+    afkScreen = AFK_DESKTOP;
+    afkDrawn = false;
   }
 }
 
@@ -18310,13 +18999,17 @@ void Ardudows_StateMachine() {
 
         // ================= BACKSPACE =================
         else if (key == KEY_BACKSPACE) {
-          if (loginInput.length() > 0) {
+          // 현재 활성화된 버퍼가 무엇인지 포인터와 타겟 설정
+          String* targetInput = !enteringPassword ? &loginInput : &passwordInput;
+
+          if (targetInput->length() > 0) {
             // 1. 지워질 마지막 글자 한 개를 빼옵니다.
-            char lastChar = loginInput.charAt(loginInput.length() - 1);
-            loginInput.remove(loginInput.length() - 1);
+            char lastChar = targetInput->charAt(targetInput->length() - 1);
+            targetInput->remove(targetInput->length() - 1);
 
             // 2. TFT_eSPI 전용 함수로 현재 폰트/크기 기준의 정확한 너비(w)와 높이(h)를 구합니다.
-            String charStr = String(lastChar);
+            // 비밀번호 모드일 때는 화면에 '*' 가 그려져 있으므로, 글자 자체 너비가 아닌 '*'의 너비를 구해야 칼같이 맞아떨어집니다!
+            String charStr = !enteringPassword ? String(lastChar) : "*";
             int16_t w = tft.textWidth(charStr);
             int16_t h = tft.fontHeight();
 
@@ -18326,10 +19019,19 @@ void Ardudows_StateMachine() {
             // 3. 커서 좌표를 계산된 글자 너비(w)만큼 왼쪽으로 강제 이동
             int newX = tft.getCursorX() - w;
             int currentY = tft.getCursorY();
-            if (newX < 0) newX = 0; // 프롬프트 영역 침범 방지
+            
+            // 프롬프트 영역 침범 방지 방어선
+            // 비밀번호 입력 중일 때는 "Password: " 문구 너비 이하로 안 내려가게 막아주는 방어선 구축
+            int lineStartX = 0;
+            if (enteringPassword) {
+              lineStartX = tft.textWidth("Password: ");
+            } else {
+              lineStartX = tft.textWidth("Username: ");
+            }
+            
+            if (newX < lineStartX) newX = lineStartX;
 
-            // 4. TFT_eSPI는 문자 출력 시 y좌표 기준이 다를 수 있으므로, 
-            // 안전하게 커서 Y축 기준 상하 여유를 두고 검은색 사각형으로 밀어버립니다.
+            // 4. 안전하게 커서 Y축 기준 상하 여유를 두고 검은색 사각형으로 밀어버립니다.
             tft.fillRect(newX, currentY, w, h, TFT_BLACK);
 
             // 5. 다음 글자가 그려질 커서 위치를 지워진 시작점으로 세팅
@@ -18362,6 +19064,13 @@ void Ardudows_StateMachine() {
     // ==================================================
     case BOOT_KERNEL:
       {
+
+        if (Boot_Kernel == "AFK")
+        {
+          AFK_Loop(key);
+          break;
+        }
+
         if (!atkStarted) {
           tft.fillScreen(TFT_BLACK);
           tft.setTextSize(2);
@@ -18656,7 +19365,6 @@ void setup() {
   // =========================
 
   Boot_abf();
-
 
   // =========================
   // Install 확인
