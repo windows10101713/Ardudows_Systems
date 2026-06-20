@@ -30,6 +30,9 @@
 //171일차 이제 Username에서 Password까지 쳐야됨
 //171일차 친구의 플레이 리스트 약 3시간 중 약 1시간 들음
 //이예ㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔㅔ 67
+//178일차 드디어 2만줄 달성!
+//178일차 x86 에뮬레이터 제작 시작
+//178일차 너무 어려워서 치웠더니 2만줄 실패
 
 //===겁나 쉬운 라이브러리 불러오기===
 //이때가 젤 좋았었음...
@@ -156,6 +159,25 @@
 
 //===대입문(?)과 변수등 일단 뭐 아무거나 선언===
 
+// ===============================
+// 🔥 COMPLEX TYPE
+// ===============================
+struct Complex {
+    double r, i;
+};
+
+// ===============================
+// 🔥 VALUE SYSTEM (INT / FLOAT / COMPLEX)
+// ===============================
+enum ValueType { INT, FLOAT, COMPLEX };
+
+struct Value {
+    ValueType type;
+    long long i;
+    double f;
+    Complex c;
+};
+
 // ============================================
 // AFK Desktop
 // ============================================
@@ -276,12 +298,6 @@ AsyncWebServer server(81);
 uint8_t final_rtc_data_221; 
 char final_time_str_221;
 #define SPK 12
-// ==========================================
-// 인류 수학의 코어: 복소수 구조체 및 엔진
-// ==========================================
-struct Complex {
-    double r, i;
-};
 // 파일 맨 상단 #include 아래에 추가
 // --- VNC & Input Global Variables ---
 //bool mouse_moved = false;
@@ -9323,222 +9339,303 @@ void cmd_usb(String cmd) {
 }
 
 //===계산기===
-//#include <math.h>
 
-Complex c_add(Complex a, Complex b) { return {a.r + b.r, a.i + b.i}; }
-Complex c_sub(Complex a, Complex b) { return {a.r - b.r, a.i - b.i}; }
-Complex c_mul(Complex a, Complex b) { return {a.r * b.r - a.i * b.i, a.r * b.i + a.i * b.r}; }
-Complex c_div(Complex a, Complex b) {
-    double d = b.r * b.r + b.i * b.i;
-    if (d == 0) return {NAN, NAN}; // 0으로 나누기 방어
-    return {(a.r * b.r + a.i * b.i) / d, (a.i * b.r - a.r * b.i) / d};
-}
-Complex c_pow(Complex a, Complex b) {
-    if (a.r == 0 && a.i == 0) return {0, 0};
-    double arg = atan2(a.i, a.r);
-    double log_r = 0.5 * log(a.r * a.r + a.i * a.i);
-    double real_p = exp(b.r * log_r - b.i * arg);
-    double im_p = b.r * arg + b.i * log_r;
-    return {real_p * cos(im_p), real_p * sin(im_p)};
-}
-Complex c_exp(Complex a) {
-    double e = exp(a.r);
-    return {e * cos(a.i), e * sin(a.i)};
-}
-Complex c_log(Complex a) {
-    return {0.5 * log(a.r * a.r + a.i * a.i), atan2(a.i, a.r)};
-}
-Complex c_sin(Complex a) { return {sin(a.r) * cosh(a.i), cos(a.r) * sinh(a.i)}; }
-Complex c_cos(Complex a) { return {cos(a.r) * cosh(a.i), -sin(a.r) * sinh(a.i)}; }
-Complex c_tan(Complex a) { return c_div(c_sin(a), c_cos(a)); }
+//=========================
 
-// ==========================================
-// 파서 전방 선언
-// ==========================================
+//🔥 HEADERS / DEFINES
+
+//=========================
+
+#define PI 3.141592653589793
+#define E  2.718281828459045
+
+//=========================
+
+//🔥 OUTPUT ENGINE (고급 출력)
+
+//=========================
+
+void printNum(double x){
+    if (isnan(x) || isinf(x)) {
+        tft.print("ERR");
+        return;
+    }
+
+    if (fabs(x - round(x)) < 1e-10) {
+        tft.print((long long)round(x));
+    } else {
+        tft.print(x, 8);
+    }
+}
+
+void printComplex(Complex c){
+    tft.print(">> ");
+
+    bool r0 = fabs(c.r) < 1e-12;
+    bool i0 = fabs(c.i) < 1e-12;
+
+    if (r0 && i0) {
+        tft.println("0");
+        return;
+    }
+
+    if (!r0) printNum(c.r);
+
+    if (!i0) {
+        if (!r0 && c.i > 0) tft.print(" + ");
+        if (c.i < 0) tft.print(" - ");
+
+        printNum(fabs(c.i));
+        tft.print("i");
+    }
+
+    tft.println();
+}
+
+//=========================
+
+//🔥 VARIABLE SYSTEM
+
+//=========================
+
+#define MAX_VARS 32
+
+struct Var {
+    String name;
+    Value val;
+};
+
+Var vars[MAX_VARS];
+int varCount = 0;
+
+void setVar(String name, Value v){
+    for(int i=0;i<varCount;i++){
+        if(vars[i].name == name){
+            vars[i].val = v;
+            return;
+        }
+    }
+
+    if(varCount < MAX_VARS){
+        vars[varCount++] = {name, v};
+    }
+}
+
+Value getVar(String name){
+    for(int i=0;i<varCount;i++){
+        if(vars[i].name == name) return vars[i].val;
+    }
+    return {FLOAT, 0, 0, {0,0}};
+}
+
+//=========================
+
+//🔥 CONVERSION
+
+//=========================
+
+double ValueToDouble(Value v){
+    if(v.type == INT) return (double)v.i;
+    if(v.type == FLOAT) return v.f;
+    return v.c.r;
+}
+
+Value makeFloat(double x){
+    return {FLOAT,0,x,{0,0}};
+}
+
+//=========================
+
+//🔥 COMPLEX OPS
+
+//=========================
+
+Complex c_add(Complex a, Complex b){ return {a.r+b.r, a.i+b.i}; }
+Complex c_sub(Complex a, Complex b){ return {a.r-b.r, a.i-b.i}; }
+Complex c_mul(Complex a, Complex b){ return {a.r*b.r - a.i*b.i, a.r*b.i + a.i*b.r}; }
+
+Complex c_div(Complex a, Complex b){
+    double d = b.r*b.r + b.i*b.i;
+    if(d==0) return {NAN,NAN};
+    return {(a.r*b.r + a.i*b.i)/d, (a.i*b.r - a.r*b.i)/d};
+}
+
+//=========================
+
+//🔥 ADV MATH
+
+//=========================
+
+Complex c_sin(Complex a){ return {sin(a.r)*cosh(a.i), cos(a.r)*sinh(a.i)}; }
+Complex c_cos(Complex a){ return {cos(a.r)*cosh(a.i), -sin(a.r)*sinh(a.i)}; }
+Complex c_log(Complex a){ return {0.5*log(a.r*a.r+a.i*a.i), atan2(a.i,a.r)}; }
+
+Complex c_sqrt(Complex a){
+    double r = sqrt(a.r*a.r + a.i*a.i);
+    double t = atan2(a.i,a.r)/2;
+    return {sqrt(r)*cos(t), sqrt(r)*sin(t)};
+}
+
+Complex c_pow(Complex a, Complex b){
+    double r = sqrt(a.r*a.r + a.i*a.i);
+    if(r == 0) return {0,0};
+
+    double t = atan2(a.i,a.r);
+    double lr = log(r);
+
+    double x = exp(b.r*lr - b.i*t);
+    double y = b.r*t + b.i*lr;
+
+    return {x*cos(y), x*sin(y)};
+}
+
+//=========================
+
+//🔥 PARSER DECL
+
+//=========================
+
 Complex pExpr(const char*& e);
 Complex pTerm(const char*& e);
 Complex pPower(const char*& e);
 Complex pFact(const char*& e);
 
-// ==========================================
-// Ardudows 뇌절 특수 기능 엔진
-// ==========================================
+//=========================
 
-// 🚀 1. 복소수 기반 2D 그래프 렌더러
-void plotGraph(String expr) {
-    tft.fillScreen(TFT_BLACK);
-    // 모눈종이 배경
-    for(int i=0; i<tft.width(); i+=20) tft.drawLine(i, 0, i, tft.height(), 0x2104);
-    for(int i=0; i<tft.height(); i+=20) tft.drawLine(0, i, tft.width(), i, 0x2104);
-    tft.drawLine(tft.width()/2, 0, tft.width()/2, tft.height(), TFT_WHITE);
-    tft.drawLine(0, tft.height()/2, tft.width(), tft.height()/2, TFT_WHITE);
+//🔥 FACTOR
 
-    double prev_py = NAN;
-    for (int px = 0; px < tft.width(); px++) {
-        double x_val = (px - tft.width()/2.0) / 20.0;
-        String cur = expr;
-        cur.replace("x", "(" + String(x_val, 6) + ")");
-        const char* p = cur.c_str();
-        Complex res = pExpr(p); 
+//=========================
 
-        // 결과의 실수부만 Y축에 매핑
-        int py = tft.height()/2 - (int)(res.r * 20.0); 
-        if (!isnan(prev_py) && py >= 0 && py < tft.height() && prev_py >= 0 && prev_py < tft.height()) {
-            tft.drawLine(px-1, (int)prev_py, px, py, TFT_YELLOW);
-        }
-        prev_py = (double)py;
-        if(px % 5 == 0) yield(); // ESP32-S3 Watchdog 타이머 리셋
-    }
-}
+Complex pFact(const char*& e){
 
-// 🚀 2. 무한 소수 사냥 (Prime Hunt)
-void primeHunt() {
-    tft.fillScreen(TFT_BLACK);
-    tft.setCursor(0,0);
-    tft.println(">> PRIME HUNTING...");
-    unsigned long n = 2;
-    while(true) {
-        bool isP = true;
-        for(unsigned long i=2; i*i<=n; i++) {
-            if(n % i == 0) { isP = false; break; }
-        }
-        if(isP) {
-            tft.setTextColor(random(0x07E0, 0xFFFF)); 
-            tft.print(String(n) + " ");
-        }
-        n++;
-        // PS/2 ESC 중단 로직 자리: if(get_raw_ps2_sc() == 0x76) break;
-        if(n % 50 == 0) yield();
-    }
-}
+    while(*e==' ') e++;
 
-// 🚀 3. 원주율 극한 스트림
-void piInfinite() {
-    tft.fillScreen(TFT_BLACK);
-    tft.setCursor(0,0);
-    tft.setTextColor(TFT_GREEN);
-    tft.println(">> PI STREAM (Infinite Series)");
-    double pi = 0;
-    for(long k=0; k<100000; k++) {
-        pi += (k % 2 == 0 ? 1.0 : -1.0) / (2.0 * k + 1.0);
-        if(k % 10 == 0) {
-            tft.print(String(pi * 4.0, 7) + ".. ");
-            if(tft.getCursorY() > tft.height()-10) tft.setCursor(0,0); // 화면 넘어가면 리셋
-        }
-        yield();
-    }
-}
+    if(strncmp(e,"PI",2)==0){ e+=2; return {PI,0}; }
+    if(strncmp(e,"E",1)==0){ e+=1; return {E,0}; }
 
-// ==========================================
-// 메인 진입점: Profecalc
-// ==========================================
-void Profecalc(String input) {
-    input.trim();
-    
-    // 특수 명령어 감지
-    if (input.startsWith("plot ")) { plotGraph(input.substring(5)); return; }
-    if (input == "prime") { primeHunt(); return; }
-    if (input == "pi_inf") { piInfinite(); return; }
+    if(strncmp(e,"sin",3)==0){ e+=3; return c_sin(pFact(e)); }
+    if(strncmp(e,"cos",3)==0){ e+=3; return c_cos(pFact(e)); }
+    if(strncmp(e,"log",3)==0){ e+=3; return c_log(pFact(e)); }
+    if(strncmp(e,"sqrt",4)==0){ e+=4; return c_sqrt(pFact(e)); }
 
-    // 일반 수식 계산 (공백 제거 및 상수 치환)
-    input.replace(" ", "");
-    input.replace("PI", String(M_PI, 10));
-    const char* p = input.c_str();
-    
-    tft.setTextColor(TFT_CYAN);
-    tft.print(">> EVAL: ");
-    tft.setTextColor(TFT_WHITE);
-    tft.println(input);
-
-    Complex res = pExpr(p);
-
-    tft.print(">> ANS: ");
-    if (isnan(res.r)) {
-        tft.setTextColor(TFT_RED);
-        tft.println("Math Error (NaN)");
-    } else {
-        tft.setTextColor(TFT_GREEN);
-        tft.print(res.r, 15);
-        if (abs(res.i) > 0.000000000000001) { // 허수부가 존재하면 복소수 형태로 출력
-            tft.print(res.i >= 0 ? " + " : " - ");
-            tft.print(abs(res.i), 6);
-            tft.println("i");
-        } else {
-            tft.println("");
-        }
-    }
-}
-
-// ==========================================
-// 구문 분석기 (재귀적 하향 파서)
-// ==========================================
-Complex pExpr(const char*& e) {
-    Complex res = pTerm(e);
-    while (*e == '+' || *e == '-') {
-        char op = *e++;
-        if (op == '+') res = c_add(res, pTerm(e));
-        else res = c_sub(res, pTerm(e));
-    }
-    return res;
-}
-
-Complex pTerm(const char*& e) {
-    Complex res = pPower(e);
-    while (*e == '*' || *e == '/') {
-        char op = *e++;
-        if (op == '*') res = c_mul(res, pPower(e));
-        else res = c_div(res, pPower(e));
-    }
-    return res;
-}
-
-Complex pPower(const char*& e) {
-    Complex res = pFact(e);
-    if (*e == '^') {
+    if(*e=='('){
         e++;
-        res = c_pow(res, pPower(e)); // 우측 결합성(Right-associative)을 위한 재귀
-    }
-    return res;
-}
-
-Complex pFact(const char*& e) {
-    while (*e == ' ') e++;
-    
-    // 단항 부호 처리
-    if (*e == '+') { e++; return pFact(e); }
-    if (*e == '-') { e++; Complex v = pFact(e); return {-v.r, -v.i}; }
-    
-    // 괄호 처리
-    if (*e == '(') {
-        e++; 
         Complex v = pExpr(e);
-        if (*e == ')') e++;
+        if(*e==')') e++;
         return v;
     }
-    
-    // 복소수 지원 수학 함수들
-    if (strncmp(e, "exp", 3) == 0)  { e += 3; return c_exp(pFact(e)); }
-    if (strncmp(e, "sqrt", 4) == 0) { e += 4; return c_pow(pFact(e), {0.5, 0}); }
-    if (strncmp(e, "sin", 3) == 0)  { e += 3; return c_sin(pFact(e)); }
-    if (strncmp(e, "cos", 3) == 0)  { e += 3; return c_cos(pFact(e)); }
-    if (strncmp(e, "tan", 3) == 0)  { e += 3; return c_tan(pFact(e)); }
-    if (strncmp(e, "log", 3) == 0 || strncmp(e, "ln", 2) == 0) { 
-      if (strncmp(e, "log", 3) == 0) e += 3; else e += 2; // 확실하게 글자 수만큼 포인터 이동
-      return c_log(pFact(e)); 
+
+    char* end;
+    double r = strtod(e,&end);
+    if(end!=e){
+        e=end;
+        return {r,0};
     }
 
-    // 허수 단위 'i' 단독 처리 (예: i*PI)
-    if (*e == 'i') { e++; return {0, 1}; }
+    if(isalpha(*e)){
+        char name[16];
+        int i=0;
+        while(isalnum(*e)){
+            name[i++] = *e++;
+        }
+        name[i]='\0';
 
-    // 숫자 파싱
-    char* end;
-    double r = strtod(e, &end);
-    e = end;
-    
-    // 숫자 바로 뒤에 i가 붙는 경우 처리 (예: 5i)
-    if (*e == 'i') { e++; return {0, r}; }
-    
-    return {r, 0};
+        Value v = getVar(String(name));
+        return {ValueToDouble(v),0};
+    }
+
+    return {0,0};
+}
+
+//=========================
+
+//🔥 POWER (CRITICAL FIX)
+
+//=========================
+
+Complex pPower(const char*& e){
+    Complex base = pFact(e);
+
+    if(*e=='^'){
+        e++;
+        Complex expv = pPower(e);
+        return c_pow(base, expv);
+    }
+
+    return base;
+}
+
+//=========================
+
+//🔥 TERM
+
+//=========================
+
+Complex pTerm(const char*& e){
+    Complex res = pPower(e);
+
+    while(*e=='*' || *e=='/' || *e=='%'){
+        char op = *e++;
+
+        if(op=='*') res = c_mul(res, pPower(e));
+        else if(op=='/') res = c_div(res, pPower(e));
+        else {
+            Complex v = pPower(e);
+            if(v.r == 0) return {NAN,NAN};
+            res = {(double)((long long)res.r % (long long)v.r), 0};
+        }
+    }
+
+    return res;
+}
+
+//=========================
+
+//🔥 EXPR
+
+//=========================
+
+Complex pExpr(const char*& e){
+    Complex res = pTerm(e);
+
+    while(*e=='+' || *e=='-'){
+        char op = *e++;
+        if(op=='+') res = c_add(res, pTerm(e));
+        else res = c_sub(res, pTerm(e));
+    }
+
+    return res;
+}
+
+//=========================
+
+//🔥 MAIN ENGINE
+
+//=========================
+
+void Profecalc(String input){
+
+    input.replace(" ","");
+
+    int eq = input.indexOf('=');
+
+    if(eq != -1){
+        String name = input.substring(0,eq);
+        String expr = input.substring(eq+1);
+
+        const char* p = expr.c_str();
+        Complex v = pExpr(p);
+
+        setVar(name, makeFloat(v.r));
+
+        tft.println("OK");
+        return;
+    }
+
+    const char* p = input.c_str();
+    Complex res = pExpr(p);
+
+    printComplex(res);
 }
 
 /**
@@ -13150,6 +13247,28 @@ void Arch_Linux() {
   }
 }
 
+// 이미지 출력 콜백 함수 (TFT로 픽셀을 뿌려주는 역할)
+bool tft_output(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t* bitmap) {
+    tft.pushImage(x, y, w, h, bitmap);
+    return 1;
+}
+
+void draw_boot_image(const char* filename) {
+    tft.fillScreen(TFT_BLACK);
+    
+    // TJpg_Decoder 설정
+    TJpgDec.setJpgScale(1);
+    TJpgDec.setCallback(tft_output);
+    TJpgDec.setSwapBytes(true); 
+
+    // SD 카드에서 이미지 파일 읽어와서 화면에 그리기
+    if (TJpgDec.drawSdJpg(0, 0, filename)) {
+        Serial.println("Boot Image Loaded Successfully!");
+    } else {
+        tft.println("Boot Image Load Failed!");
+    }
+}
+
 // ================== COMMAND PARSER ==================
 
 /*
@@ -15577,25 +15696,81 @@ void executeCommand(String cmd) {
     //tft.printf(">> TIME: %s\n", getNowTime().c_str());
   //}
 
-  // --- [ Ardudows Professional Math Engine ] ---
   else if (cmd.startsWith("calc ")) {
-    String expression = cmd.substring(5); // "calc " 뒷부분만 싹 가져옴
+
+    String expression = cmd.substring(5);
     expression.trim();
-    
-    if (expression.length() > 0) {
-        tft.setTextColor(TFT_YELLOW);
-        tft.print(">> CALC: ");
-        tft.setTextColor(TFT_WHITE);
-        tft.println(expression);
-        tft.setTextColor(TFT_GREEN);
-        
-        // 형님이 만든 무적의 엔진 호출!
-        Profecalc(expression); 
-    } else {
-        tft.println("Usage: calc <expression>");
-        tft.println("Ex: calc 5+3*sqrt(16)");
+
+    // =========================
+    // 🔥 1. HELP 먼저 처리 (중요!)
+    // =========================
+    if (expression == "help") {
+
+      tft.setTextColor(TFT_CYAN);
+      tft.println("===== CALC HELP =====");
+
+      tft.setTextColor(TFT_WHITE);
+
+      tft.println("\n[ BASIC USAGE ]");
+      tft.println("calc 1+1");
+      tft.println("calc (5+2)^3");
+
+      tft.println("\n[ VARIABLES ]");
+      tft.println("x=5");
+      tft.println("y=10");
+      tft.println("calc x+y");
+
+      tft.println("\n[ FUNCTIONS ]");
+      tft.println("sin(x), cos(x), log(x)");
+      tft.println("sqrt(x), abs(x)");
+
+      tft.println("\n[ CONSTANTS ]");
+      tft.println("PI, E");
+
+      tft.println("\n[ OPERATORS ]");
+      tft.println("+  -  *  /  ^  %");
+
+      tft.println("\n[ COMPLEX ]");
+      tft.println("5+3i, i*i");
+
+      tft.println("\n[ EXAMPLES ]");
+      tft.println("calc sqrt(16)");
+      tft.println("calc sin(PI/2)");
+      tft.println("calc x=3");
+
+      tft.setTextColor(TFT_GREEN);
+      tft.println("\nREADY.");
+
+      return;
     }
-    tft.setTextColor(TFT_GREEN);
+
+    // =========================
+    // 🔥 2. 일반 계산
+    // =========================
+    if (expression.length() > 0) {
+
+      tft.setTextColor(TFT_YELLOW);
+      tft.print(">> CALC: ");
+      tft.setTextColor(TFT_WHITE);
+      tft.println(expression);
+
+      tft.setTextColor(TFT_GREEN);
+
+      // 엔진 호출
+      Profecalc(expression);
+    }
+
+    // =========================
+    // 🔥 3. 빈 입력 처리
+    // =========================
+    else {
+      tft.setTextColor(TFT_CYAN);
+      tft.println("Usage:");
+      tft.println("  calc <expression>");
+      tft.println("  calc help");
+
+      tft.setTextColor(TFT_GREEN);
+    }
   }
 
   // --- [ ARDUDOWS VNC DIRECT ENGINE ] ---
@@ -17748,6 +17923,168 @@ void executeCommand(String cmd) {
     tft.println(F(" sd geometry   : Analyze Sectors & Raw Byte Capacity"));
     tft.println(F(" sd status_all : Generate Full Register Matrix Report"));
     tft.println(F("================================================="));
+  }
+
+  // 쉘 루프 내부의 명령어 처리부
+  else if (cmd.startsWith("image ")) {
+    String img_name; // 유저가 입력한 파일명
+    img_name.trim();
+
+    // 1. 파일 경로 지정 (원하는 경로로 수정 가능)
+    String img_path = "/Ardudows/Assets/Image/" + img_name;
+    
+    tft.printf("[Graphics] print image: %s\n", img_path.c_str());
+
+    // 2. TJpg_Decoder 초기화
+    TJpgDec.setJpgScale(1);
+    TJpgDec.setCallback(tft_output); // 위에서 만든 tft_output 콜백 함수 필요!
+    TJpgDec.setSwapBytes(true); 
+
+    // 3. 화면 지우고 출력 시도
+    tft.fillScreen(TFT_BLACK);
+    if (TJpgDec.drawSdJpg(0, 0, img_path.c_str())) {
+      delay(1000);
+      tft.setTextColor(TFT_GREEN, TFT_BLACK);
+      tft.println("\n[OK] Image displayed.");
+    } else {
+      tft.setTextColor(TFT_RED, TFT_BLACK);
+      tft.printf("\n[Error] Failed to load %s\n", img_name.c_str());
+    }
+  }
+
+  else if (cmd.startsWith("esp wifi ")) {
+    String s = cmd.substring(9);
+    if (s == "start") esp_wifi_start();
+    else if (s == "help") {
+      tft.println(F("--- ESP WIFI HELP (1/3) ---"));
+      tft.println(F("Basic: start, stop, restart, sta, ap, apsta"));
+      tft.println(F("Power: txp [val], ps_none, ps_min, ps_max"));
+      tft.println(F("Net: get_ip, connect, disconnect, scan_on"));
+      tft.println(F("--- ESP WIFI HELP (2/3) ---"));
+      tft.println(F("Radio: ch [num], bw20, bw40, rssi, mac"));
+      tft.println(F("AP: ap_max_conn [n], ap_hidden, ap_visible"));
+      tft.println(F("Status: stats, get_mode, get_chan, get_heap"));
+      tft.println(F("--- ESP WIFI HELP (3/3) ---"));
+      tft.println(F("Advanced: promisc_on, csi_on, tx_buf [n]"));
+      tft.println(F("System: get_temp, get_time, get_vers"));
+    }
+    else if (s == "stop") esp_wifi_stop();
+    else if (s == "restart") { esp_wifi_stop(); delay(100); esp_wifi_start(); }
+    else if (s == "sta") esp_wifi_set_mode(WIFI_MODE_STA);
+    else if (s == "ap") esp_wifi_set_mode(WIFI_MODE_AP);
+    else if (s == "apsta") esp_wifi_set_mode(WIFI_MODE_APSTA);
+    else if (s.startsWith("txp ")) esp_wifi_set_max_tx_power(s.substring(4).toInt());
+    else if (s.startsWith("ch ")) esp_wifi_set_channel(s.substring(3).toInt(), WIFI_SECOND_CHAN_NONE);
+    else if (s == "bw20") esp_wifi_set_bandwidth(WIFI_IF_STA, WIFI_BW_HT20);
+    else if (s == "bw40") esp_wifi_set_bandwidth(WIFI_IF_STA, WIFI_BW_HT40);
+    else if (s.startsWith("proto ")) esp_wifi_set_protocol(WIFI_IF_STA, s.substring(6).toInt());
+    //else if (s == "rssi") { int8_t r; esp_wifi_sta_get_rssi(&r); tft.println(r); }
+    else if (s == "mac") { uint8_t m[6]; esp_wifi_get_mac(WIFI_IF_STA, m); tft.printf("%02X:%02X:%02X:%02X:%02X:%02X\n", m[0], m[1], m[2], m[3], m[4], m[5]); }
+    else if (s == "stats") { wifi_sta_list_t l; esp_wifi_ap_get_sta_list(&l); tft.println(l.num); }
+    else if (s == "promisc_on") esp_wifi_set_promiscuous(true);
+    else if (s == "promisc_off") esp_wifi_set_promiscuous(false);
+    else if (s == "ps_none") esp_wifi_set_ps(WIFI_PS_NONE);
+    else if (s == "ps_min") esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
+    else if (s == "ps_max") esp_wifi_set_ps(WIFI_PS_MAX_MODEM);
+    //else if (s == "wps_on") esp_wifi_wps_enable(WIFI_WPS_MODE_PBC);
+    //else if (s == "wps_off") esp_wifi_wps_disable();
+    //else if (s == "get_ip") { tcpip_adapter_ip_info_t i; tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &i); tft.println(ip4addr_ntoa(&i.ip)); }
+    else if (s == "country_kr") { wifi_country_t c = {"KR", 1, 13, WIFI_COUNTRY_POLICY_MANUAL}; esp_wifi_set_country(&c); }
+    else if (s == "country_us") { wifi_country_t c = {"US", 1, 11, WIFI_COUNTRY_POLICY_MANUAL}; esp_wifi_set_country(&c); }
+    else if (s == "get_heap") tft.println(esp_get_free_heap_size());
+    else if (s == "chip_info") { esp_chip_info_t i; esp_chip_info(&i); tft.println(i.features); }
+    //else if (s == "now_init") esp_now_init();
+    //else if (s == "now_deinit") esp_now_deinit();
+    else if (s == "get_temp") tft.println(temperatureRead());
+    else if (s == "get_time") tft.println(esp_timer_get_time());
+    else if (s == "scan_on") esp_wifi_scan_start(NULL, true);
+    else if (s == "scan_off") esp_wifi_scan_stop();
+    else if (s.startsWith("set_psk ")) { wifi_config_t c; strncpy((char*)c.sta.password, s.substring(8).c_str(), 64); esp_wifi_set_config(WIFI_IF_STA, &c); }
+    else if (s.startsWith("set_ssid ")) { wifi_config_t c; strncpy((char*)c.sta.ssid, s.substring(9).c_str(), 32); esp_wifi_set_config(WIFI_IF_STA, &c); }
+    else if (s == "get_auth") { wifi_ap_record_t a; esp_wifi_sta_get_ap_info(&a); tft.println(a.authmode); }
+    //else if (s == "pmk_on") esp_wifi_set_pmk(NULL);
+    //else if (s == "c_mgmt") esp_wifi_set_country_code("KR");
+    //else if (s == "dbg_on") esp_wifi_set_debug_log(WIFI_DBG_INFO);
+    //else if (s == "dbg_off") esp_wifi_set_debug_log(WIFI_DBG_NONE);
+    //else if (s.startsWith("rx_buf ")) esp_wifi_set_rx_buf_num(s.substring(7).toInt());
+    //else if (s.startsWith("tx_buf ")) esp_wifi_set_tx_buf_num(s.substring(7).toInt());
+    //else if (s == "get_vers") tft.println(esp_wifi_get_version());
+    else if (s == "connect") esp_wifi_connect();
+    else if (s == "disconnect") esp_wifi_disconnect();
+    else if (s == "reconnect") esp_wifi_connect();
+    else if (s == "get_mode") { wifi_mode_t m; esp_wifi_get_mode(&m); tft.println(m); }
+    else if (s == "get_chan") { uint8_t c; wifi_second_chan_t s; esp_wifi_get_channel(&c, &s); tft.println(c); }
+    else if (s == "reset_config") esp_wifi_restore();
+    else if (s == "get_config") { wifi_config_t c; esp_wifi_get_config(WIFI_IF_STA, &c); tft.println((char*)c.sta.ssid); }
+    else if (s == "get_max_txp") { int8_t p; esp_wifi_get_max_tx_power(&p); tft.println(p); }
+    //else if (s == "set_ampdu") esp_wifi_set_ampdu_tx_status(true);
+    //else if (s == "unset_ampdu") esp_wifi_set_ampdu_tx_status(false);
+    else if (s == "get_sta_list") { wifi_sta_list_t l; esp_wifi_ap_get_sta_list(&l); tft.println(l.num); }
+    else if (s == "get_mac_ap") { uint8_t m[6]; esp_wifi_get_mac(WIFI_IF_AP, m); tft.printf("%02X:%02X:%02X:%02X:%02X:%02X\n", m[0], m[1], m[2], m[3], m[4], m[5]); }
+    //else if (s == "set_ap_max_conn") esp_wifi_ap_set_max_connection(subCmd.substring(17).toInt());
+    //else if (s == "get_ap_max_conn") { uint8_t c; esp_wifi_ap_get_max_connection(&c); tft.println(c); }
+    //else if (s == "set_ap_hidden") esp_wifi_ap_set_hidden(true);
+    //else if (s == "set_ap_visible") esp_wifi_ap_set_hidden(false);
+    else if (s == "get_ap_config") { wifi_config_t c; esp_wifi_get_config(WIFI_IF_AP, &c); tft.println((char*)c.ap.ssid); }
+    //else if (s == "set_ap_auth") esp_wifi_ap_set_auth(subCmd.substring(16).toInt());
+    else if (s == "get_ap_auth") { wifi_config_t c; esp_wifi_get_config(WIFI_IF_AP, &c); tft.println(c.ap.authmode); }
+    //else if (s == "set_ap_chan") esp_wifi_set_channel(subCmd.substring(16).toInt(), WIFI_SECOND_CHAN_NONE);
+    else if (s == "get_ap_chan") { uint8_t c; wifi_second_chan_t s; esp_wifi_get_channel(&c, &s); tft.println(c); }
+    else if (s == "set_ap_bw") esp_wifi_set_bandwidth(WIFI_IF_AP, WIFI_BW_HT20);
+    else if (s == "set_ap_bw40") esp_wifi_set_bandwidth(WIFI_IF_AP, WIFI_BW_HT40);
+    //else if (s == "set_sta_bssid") { uint8_t b[6]; esp_wifi_set_bssid(b); }
+    //else if (s == "get_sta_bssid") { uint8_t b[6]; esp_wifi_get_bssid(b); tft.printf("%02X:%02X:%02X:%02X:%02X:%02X\n", b[0], b[1], b[2], b[3], b[4], b[5]); }
+    else if (s == "get_link_status") { wifi_second_chan_t s; tft.println(esp_wifi_sta_get_ap_info(NULL)); }
+    else if (s == "set_event_mask") esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, NULL, NULL, NULL);
+    else if (s == "set_sta_proto") esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N);
+    else if (s == "set_ap_proto") esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N);
+    else if (s == "get_sta_proto") { uint8_t p; esp_wifi_get_protocol(WIFI_IF_STA, &p); tft.println(p); }
+    else if (s == "get_ap_proto") { uint8_t p; esp_wifi_get_protocol(WIFI_IF_AP, &p); tft.println(p); }
+    //else if (s == "set_mgmt_key") esp_wifi_set_mgmt_key(NULL);
+    else if (s == "get_mgmt_key") tft.println("Key_Hidden");
+    //else if (s == "set_tsf") esp_wifi_set_tsf_time(0);
+    else if (s == "get_tsf") tft.println((uint32_t)esp_wifi_get_tsf_time(WIFI_IF_STA));
+    else if (s == "get_sta_list_num") { wifi_sta_list_t l; esp_wifi_ap_get_sta_list(&l); tft.println(l.num); }
+    else if (s == "clear_sta_list") esp_wifi_ap_get_sta_list(NULL);
+    else if (s == "get_mem_info") { multi_heap_info_t i; heap_caps_get_info(&i, MALLOC_CAP_8BIT); tft.printf("Free: %d\n", i.total_free_bytes); }
+    //else if (s == "set_ampdu_rx") esp_wifi_set_ampdu_rx_status(true);
+    //else if (s == "unset_ampdu_rx") esp_wifi_set_ampdu_rx_status(false);
+    //else if (s == "get_amsdu_tx") tft.println(esp_wifi_get_amsdu_tx_status());
+    //else if (s == "set_amsdu_tx") esp_wifi_set_amsdu_tx_status(true);
+    //else if (s == "get_max_age") tft.println(esp_wifi_get_max_age());
+    //else if (s == "set_max_age") esp_wifi_set_max_age(subCmd.substring(18).toInt());
+    //else if (s == "get_beacon_interval") { uint16_t i; esp_wifi_get_beacon_interval(&i); tft.println(i); }
+    //else if (s == "set_beacon_interval") esp_wifi_set_beacon_interval(subCmd.substring(20).toInt());
+    //else if (s == "get_dtim") { uint8_t i; esp_wifi_get_dtim_period(&i); tft.println(i); }
+    //else if (s == "set_dtim") esp_wifi_set_dtim_period(subCmd.substring(15).toInt());
+    else if (s == "get_log_level") tft.println(esp_log_level_get("wifi"));
+    else if (s == "set_log_level") esp_log_level_set("wifi", ESP_LOG_VERBOSE);
+    else if (s == "get_country_policy") { wifi_country_t c; esp_wifi_get_country(&c); tft.println(c.policy); }
+    else if (s == "set_country_policy") { wifi_country_t c; c.policy = WIFI_COUNTRY_POLICY_AUTO; esp_wifi_set_country(&c); }
+    //else if (s == "get_sta_negotiated_rate") { wifi_phy_rate_t r; esp_wifi_sta_get_negotiated_phy_rate(&r); tft.println(r); }
+    //else if (s == "get_ap_negotiated_rate") { wifi_phy_rate_t r; esp_wifi_ap_get_negotiated_phy_rate(&r); tft.println(r); }
+    //else if (s == "set_wifi_internal_log") esp_wifi_set_debug_log(WIFI_DBG_ALL);
+    //else if (s == "get_wifi_memory") tft.println(esp_wifi_get_wifi_memory());
+    //else if (s == "get_csi_config") { wifi_csi_config_t c; esp_wifi_csi_get_config(&c); tft.println(c.manual_enabled); }
+    else if (s == "set_csi_on") esp_wifi_set_csi(true);
+    else if (s == "set_csi_off") esp_wifi_set_csi(false);
+    else if (s == "get_wifi_task_priority") tft.println(uxTaskPriorityGet(NULL)); 
+    //else if (s == "set_wifi_task_priority") vTaskPrioritySet(NULL, subCmd.substring(23).toInt());
+    else if (s == "get_wifi_stack_hwm") tft.println(uxTaskGetStackHighWaterMark(NULL));
+    else if (s == "get_wifi_connection_info") { wifi_ap_record_t a; esp_wifi_sta_get_ap_info(&a); tft.println(a.primary); }
+    //else if (s == "set_pmf_on") esp_wifi_set_pmf_cap(true);
+    //else if (s == "set_pmf_off") esp_wifi_set_pmf_cap(false);
+    //else if (s == "get_pmf_cap") tft.println(esp_wifi_get_pmf_cap());
+    //else if (s == "wifi_dump_all") { /* 현재 모든 Wi-Fi 파라미터 덤프 */ }
+    else {
+      tft.println("use : esp wifi <arg>");
+    }
+  }
+
+  else if(cmd.startsWith("serial ")) {
+    String text = cmd.substring(7);
+    text.trim();
+    Serial.println(text);
   }
 
   // --- [ UNKNOWN ] ---
